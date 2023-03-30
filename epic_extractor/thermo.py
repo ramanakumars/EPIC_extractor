@@ -29,15 +29,30 @@ class Planet():
         self.x3 = extract.x3
         self.cpr = extract.cpr
         self.rgas = extract.Ratmo
+        self.p0 = extract.p0
+        self.kappa = 1. / self.cpr
 
+        self.thermo_setup()
+
+    @classmethod
+    def from_values(cls, xh2, xhe, x3, cpr, rgas, p0):
+        cls.xh2 = xh2
+        cls.xhe = xhe
+        cls.x3 = x3
+        cls.cpr = cpr
+        cls.rgas = rgas
+        cls.p0 = p0
+
+        cls.thermo_setup()
+
+        return cls
+
+    def thermo_setup(self):
         self.t_grid = np.zeros(MDIM_THERMO)
         self.theta_grid = np.zeros(MDIM_THERMO)
         self.tharray = np.zeros((5, MDIM_THERMO))  # thermo.array in EPIC
         self.theta_array = np.zeros((2, MDIM_THERMO))
 
-        self.thermo_setup()
-
-    def thermo_setup(self):
         a = np.zeros(8)
         z = np.zeros((3, 2))
         jmax = 50
@@ -77,7 +92,7 @@ class Planet():
 
         for i in range(MDIM_THERMO):
             temperature = 500. * (float(i + 1) / float(MDIM_THERMO))
-            if(temperature < 10.):
+            if (temperature < 10.):
                 ho = CPRH2 * temperature
                 hp = CPRH2 * temperature
                 pottempo = temperature
@@ -104,10 +119,10 @@ class Planet():
                             np.exp(-jn[n] * (jn[n] + 1) * y)
                         for m in range(3):
                             z[m, n] += term
-                            if(m < 2):
+                            if (m < 2):
                                 term *= jn[n] * (jn[n] + 1)
 
-                    if((j > 1) & (term < 1.e20)):
+                    if ((j > 1) & (term < 1.e20)):
                         break
 
                 den = z[0, 0] + z[0, 1]
@@ -162,12 +177,12 @@ class Planet():
         '''
         fp = 0.25
 
-        if(temperature < 20.):
+        if (temperature < 20.):
             enthalpy = self.cpr * temperature
             fgibb = 0.
             uoup = 175.1340
 
-        elif(temperature > 500.):
+        elif (temperature > 500.):
             ho = 1545.3790 + 3.5 * (temperature - 500.)
             hp = 1720.3776 + 3.5 * (temperature - 500.)
 
@@ -182,7 +197,7 @@ class Planet():
                 (self.t_grid[MDIM_THERMO - 1] - self.t_grid[0])
             m = int(em)
 
-            if(m == MDIM_THERMO - 1):
+            if (m == MDIM_THERMO - 1):
                 m -= 1
                 fract = 1.
             else:
@@ -215,3 +230,42 @@ class Planet():
         cp = (h2 - h1) / (2. * deltaT)
 
         return cp
+
+    def return_theta(self, p, t, fp=0.25):
+        if self.xh2 == 0.:
+            # No hydrogen, so use standard definition of theta.
+            theta = t * np.power(self.p0 / p, self.kappa)
+        else:
+            # Use mean theta as defined in Dowling et al (1998), to handle ortho/para hydrogen.
+            if t <= 20.:
+                theta = t
+            elif t > 500.:
+                cc = self.xh2 * 2.5 * ((1. - fp) * CCOLN_THERMO + fp * CCPLN_THERMO)
+                theta = np.exp(cc / self.cpr) * \
+                    np.power(t, ((3.5 * self.xh2 + 2.5 * self.xhe + 3.5 * self.x3) / self.cpr))
+            else:
+                # 0 < em < MDIM_THERMO-1
+                em = (MDIM_THERMO - 1) * (t - self.t_grid[0]) / (self.t_grid[MDIM_THERMO - 1] - self.t_grid[0])
+                m = int(em)
+                #  0 < m < MDIM_THERMO-2
+                if (m == MDIM_THERMO - 1):
+                    m -= 1
+                    fract = 1.
+                else:
+                    fract = np.fmod(em, 1.)
+
+                thermo_vector = np.zeros(2)
+                for j in range(2):
+                    thermo_vector[j] = (1. - fract) *\
+                        self.theta_array[j][m] +\
+                        fract * self.theta_array[j][m + 1]
+
+                thetaln = (self.xh2) * \
+                    ((1. - fp) * np.log(thermo_vector[0]) + ((fp) * np.log(thermo_vector[1]))) +\
+                    (self.xhe * 2.5 + self.x3 * 3.5) * np.log(t) / self.cpr
+
+                theta = np.exp(thetaln)
+            pp = pow(self.p0 / p, self.kappa)
+            theta *= pp
+
+        return theta

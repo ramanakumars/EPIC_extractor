@@ -92,6 +92,7 @@ class Extractor():
         self.xhe = dset.planet_x_he
         self.x3 = dset.planet_x_3
         self.cpr = self.Cp / self.Ratmo
+        self.p0 = dset.grid_press0
 
         # Get info about gridbox
         self.gridni = dset.grid_ni  # nLongitudes
@@ -168,13 +169,13 @@ class Extractor():
             recheck = re.match(matchphrase, var)
 
             # if it matches the species name, add it to species var
-            if(recheck):
+            if recheck:
                 spec = recheck.group(1)
-                if(spec not in species):
+                if spec not in species:
                     species.append(spec)
             else:
                 # if it's a 4-D variable (time, z, y, x), then add it
-                if(len(dset.variables[var].shape) == 4):
+                if len(dset.variables[var].shape) == 4:
                     varlist.append(var)
 
         return varlist, species
@@ -325,4 +326,3 @@ class Extractor():
         var["ertel_pv"] = ertel_pv
 
         return var
-        
