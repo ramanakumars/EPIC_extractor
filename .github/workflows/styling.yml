@@ -19,4 +19,4 @@ jobs:
         pip install flake8
     - name: Run flake on extractor
       run: |
-        flake8 epic_extractor/ --ignore E501,W605
+        flake8 epic_extractor/ --ignore E501,W605,W504,W503
