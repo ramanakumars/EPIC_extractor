@@ -17,9 +17,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install flake8
-    - name: Run flake on parser
+    - name: Run flake on extractor
       run: |
-        flake8 bibtexparser/parser --ignore E501,W605
-    - name: Run flake on parser
-      run: |
-        flake8 bibtexparser/app.py --ignore E501,W605
+        flake8 epic_extractor/ --ignore E501,W605
