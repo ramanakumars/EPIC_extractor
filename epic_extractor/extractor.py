@@ -83,79 +83,76 @@ class Extractor():
 
         # Open the first dataset
         fname = self.iarr[0]
-        dset = ncdf.Dataset(fname, 'r')
+        with ncdf.Dataset(fname, 'r') as dset:
+            # read in useful variables
+            self.Ratmo = dset.planet_rgas
+            self.Cp = dset.planet_cp
+            self.xh2 = dset.planet_x_h2
+            self.xhe = dset.planet_x_he
+            self.x3 = dset.planet_x_3
+            self.cpr = self.Cp / self.Ratmo
+            self.p0 = dset.grid_press0
 
-        # read in useful variables
-        self.Ratmo = dset.planet_rgas
-        self.Cp = dset.planet_cp
-        self.xh2 = dset.planet_x_h2
-        self.xhe = dset.planet_x_he
-        self.x3 = dset.planet_x_3
-        self.cpr = self.Cp / self.Ratmo
-        self.p0 = dset.grid_press0
+            # Get info about gridbox
+            self.gridni = dset.grid_ni  # nLongitudes
+            self.gridnj = dset.grid_nj  # nLatituteds
+            self.gridnk = dset.grid_nk  # nHeight
 
-        # Get info about gridbox
-        self.gridni = dset.grid_ni  # nLongitudes
-        self.gridnj = dset.grid_nj  # nLatituteds
-        self.gridnk = dset.grid_nk  # nHeight
+            # Grid extents
+            self.gridlatbot = dset.grid_globe_latbot
+            self.gridlattop = dset.grid_globe_lattop
+            self.gridlonbot = dset.grid_globe_lonbot
+            self.gridlontop = dset.grid_globe_lontop
 
-        # Grid extents
-        self.gridlatbot = dset.grid_globe_latbot
-        self.gridlattop = dset.grid_globe_lattop
-        self.gridlonbot = dset.grid_globe_lonbot
-        self.gridlontop = dset.grid_globe_lontop
+            # vertical coordinates
+            self.sigmatheta = dset.variables['sigmatheta_h'][:]
+            self.sigmatheta_u = dset.variables['sigmatheta_u'][:]
+            self.sigmatheta_v = dset.variables['sigmatheta_v'][:]
+            self.sigmatheta_pv = dset.variables['sigmatheta_pv'][:]
 
-        # vertical coordinates
-        self.sigmatheta = dset.variables['sigmatheta_h'][:]
-        self.sigmatheta_u = dset.variables['sigmatheta_u'][:]
-        self.sigmatheta_v = dset.variables['sigmatheta_v'][:]
-        self.sigmatheta_pv = dset.variables['sigmatheta_pv'][:]
+            # useful for recalculating Ertel's PV
+            self.omega = dset.planet_omega_sidereal
+            self.grid_re = dset.grid_re
+            self.grid_rp = dset.grid_rp
 
-        # useful for recalculating Ertel's PV
-        self.omega = dset.planet_omega_sidereal
-        self.grid_re = dset.grid_re
-        self.grid_rp = dset.grid_rp
+            self.dln = np.radians(dset.grid_dln)
+            self.dlt = np.radians(dset.grid_dlt)
 
-        self.dln = np.radians(dset.grid_dln)
-        self.dlt = np.radians(dset.grid_dlt)
+            # Lat/lon grids for different variable types
+            self.lat_h = dset.variables["lat_h"][:]
+            self.lon_h = dset.variables["lon_h"][:]
 
-        # Lat/lon grids for different variable types
-        self.lat_h = dset.variables["lat_h"][:]
-        self.lon_h = dset.variables["lon_h"][:]
+            self.lat_u = dset.variables["lat_u"][:]
+            self.lon_v = dset.variables["lon_u"][:]
 
-        self.lat_u = dset.variables["lat_u"][:]
-        self.lon_v = dset.variables["lon_u"][:]
+            self.lat_v = dset.variables["lat_v"][:]
+            self.lon_v = dset.variables["lon_v"][:]
 
-        self.lat_v = dset.variables["lat_v"][:]
-        self.lon_v = dset.variables["lon_v"][:]
+            self.lat_pv = dset.variables["lat_pv"][:]
+            self.lon_pv = dset.variables["lon_pv"][:]
 
-        self.lat_pv = dset.variables["lat_pv"][:]
-        self.lon_pv = dset.variables["lon_pv"][:]
+            self.gravity = np.array(dset.variables['gravity'])
+            self.gave = self.gravity.mean()
 
-        self.gravity = np.array(dset.variables['gravity'])
-        self.gave = self.gravity.mean()
-
-        # set up sizes
-        self.nt = self.iarr.shape[0]
+            # set up sizes
+            self.nt = self.iarr.shape[0]
 
         # Automatically retrieve variables
         # This is slow if there are a lot of variables.
         # Can be sped up if you only need a few variables for analysis
         # by specifying
         if auto_vars:
-            self.varlist, self.species = self.get_variables(dset)
+            self.varlist, self.species = self.get_variables(fname)
         else:
             self.varlist = varlist
             self.species = species
-
-        dset.close()
 
         if get_time:
             self.setup_time()
         else:
             self.tarr = (-1.) * np.ones(self.nt)
 
-    def get_variables(self, dset):
+    def get_variables(self, fname):
         # Create the REGEX phrase for matching species names
         matchphrase = "(.*)_(solid|liquid|rain|snow|vapor)([_tendency]*)"
 
@@ -165,18 +162,19 @@ class Extractor():
 
         # loop through all the variables and check if
         # it matches the shape
-        for var in dset.variables.keys():
-            recheck = re.match(matchphrase, var)
+        with ncdf.Dataset(fname, 'r') as dset:
+            for var in dset.variables.keys():
+                recheck = re.match(matchphrase, var)
 
-            # if it matches the species name, add it to species var
-            if recheck:
-                spec = recheck.group(1)
-                if spec not in species:
-                    species.append(spec)
-            else:
-                # if it's a 4-D variable (time, z, y, x), then add it
-                if len(dset.variables[var].shape) == 4:
-                    varlist.append(var)
+                # if it matches the species name, add it to species var
+                if recheck:
+                    spec = recheck.group(1)
+                    if spec not in species:
+                        species.append(spec)
+                else:
+                    # if it's a 4-D variable (time, z, y, x), then add it
+                    if len(dset.variables[var].shape) == 4:
+                        varlist.append(var)
 
         return varlist, species
 
@@ -189,8 +187,8 @@ class Extractor():
         self.tarr = np.zeros(self.nt)
         for i, ti in enumerate(self.iarr):
             fname = self.iarr[i]
-            dset = ncdf.Dataset(fname, 'r')
-            self.tarr[i] = dset.variables['time'][0]
+            with ncdf.Dataset(fname, 'r') as dset:
+                self.tarr[i] = dset.variables['time'][0]
 
     def set_shape_factors(self):
         '''
@@ -241,45 +239,43 @@ class Extractor():
             Get the variables for a given output i
         '''
         fname = self.iarr[i]
-        dset = ncdf.Dataset(fname, 'r')
+        with ncdf.Dataset(fname, 'r') as dset:
+            if self.tarr[i] == -1:
+                self.tarr[i] = dset.variables['time'][0]
 
-        if self.tarr[i] == -1:
-            self.tarr[i] = dset.variables['time'][0]
-
-        vars = {}
-        # base EPIC dynamics variables
-        for j, var in enumerate(self.varlist):
-            vars[var] = np.array(dset.variables[var][0, :, :, :])
-
-        # cloud variables
-        for i, spec in enumerate(self.species):
-            for phase in ['solid', 'liquid', 'rain', 'vapor', 'snow']:
-                var = spec + "_" + phase
+            vars = {}
+            # base EPIC dynamics variables
+            for j, var in enumerate(self.varlist):
                 vars[var] = np.array(dset.variables[var][0, :, :, :])
+
+            # cloud variables
+            for i, spec in enumerate(self.species):
+                for phase in ['solid', 'liquid', 'rain', 'vapor', 'snow']:
+                    var = spec + "_" + phase
+                    vars[var] = np.array(dset.variables[var][0, :, :, :])
+
+                    # moist convection variables
+                    try:
+                        var = var + "_tendency"
+                        vars[var] = np.array(dset.variables[var][:, :, :])
+                    except BaseException:
+                        pass
 
                 # moist convection variables
                 try:
-                    var = var + "_tendency"
-                    vars[var] = np.array(dset.variables[var][:, :, :])
+                    var = spec + "_pbase"
+                    vars[var] = np.array(dset.variables[var][:, :])
+                    var = spec + "_cwf"
+                    vars[var] = np.array(dset.variables[var][0, :, :, :])
+                    var = spec + "_lambda_mc"
+                    vars[var] = np.array(dset.variables[var][0, :, :, :])
+                    var = spec + "_mb_mc"
+                    vars[var] = np.array(dset.variables[var][0, :, :, :])
+                    var = spec + "_dadt"
+                    vars[var] = np.array(dset.variables[var][0, :, :, :])
                 except BaseException:
                     pass
-
-            # moist convection variables
-            try:
-                var = spec + "_pbase"
-                vars[var] = np.array(dset.variables[var][:, :])
-                var = spec + "_cwf"
-                vars[var] = np.array(dset.variables[var][0, :, :, :])
-                var = spec + "_lambda_mc"
-                vars[var] = np.array(dset.variables[var][0, :, :, :])
-                var = spec + "_mb_mc"
-                vars[var] = np.array(dset.variables[var][0, :, :, :])
-                var = spec + "_dadt"
-                vars[var] = np.array(dset.variables[var][0, :, :, :])
-            except BaseException:
-                pass
-
-        dset.close()
+        
         return vars
 
     def get_ertel_pv(self, var):
