@@ -275,7 +275,6 @@ class Extractor():
                     vars[var] = np.array(dset.variables[var][0, :, :, :])
                 except BaseException:
                     pass
-        
         return vars
 
     def get_ertel_pv(self, var):
