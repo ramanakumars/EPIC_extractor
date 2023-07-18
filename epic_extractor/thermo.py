@@ -23,27 +23,20 @@ N_A = 6.02214199e23
 
 
 class Planet():
-    def __init__(self, extract):
-        self.xh2 = extract.xh2
-        self.xhe = extract.xhe
-        self.x3 = extract.x3
-        self.cpr = extract.cpr
-        self.rgas = extract.Ratmo
-        self.p0 = extract.p0
+    def __init__(self, xh2, xhe, x3, cpr, rgas, p0):
+        self.xh2 = xh2
+        self.xhe = xhe
+        self.x3 = x3
+        self.cpr = cpr
+        self.rgas = rgas
+        self.p0 = p0
         self.kappa = 1. / self.cpr
 
         self.thermo_setup()
 
     @classmethod
-    def from_values(cls, xh2, xhe, x3, cpr, rgas, p0):
-        cls.xh2 = xh2
-        cls.xhe = xhe
-        cls.x3 = x3
-        cls.cpr = cpr
-        cls.rgas = rgas
-        cls.p0 = p0
-
-        cls.thermo_setup()
+    def from_extract(cls, extract):
+        cls.__init__(extract.xh2, extract.xhe, extract.x3, extract.cpr, extract.Ratmo, extract.p0)
 
         return cls
 
