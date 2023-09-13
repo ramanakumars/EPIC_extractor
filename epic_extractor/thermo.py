@@ -36,9 +36,9 @@ class Planet():
 
     @classmethod
     def from_extract(cls, extract):
-        cls.__init__(extract.xh2, extract.xhe, extract.x3, extract.cpr, extract.Ratmo, extract.p0)
+        c = cls(extract.xh2, extract.xhe, extract.x3, extract.cpr, extract.Ratmo, extract.p0)
 
-        return cls
+        return c
 
     def thermo_setup(self):
         self.t_grid = np.zeros(MDIM_THERMO)
