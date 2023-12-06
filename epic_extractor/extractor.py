@@ -1,5 +1,5 @@
 import numpy as np
-import netCDF4 as ncdf
+import netCDF4 as nc
 import os
 import re
 import glob
@@ -19,15 +19,16 @@ class Extractor():
 
     """
 
-    def __init__(self, imgfolder=".", plotfolder="plots/"):
+    def __init__(self, imgfolder=".", plotfolder="plots/", validate_files=True):
         """
         Initializes the extractor
         """
         self.imgfolder = os.path.abspath(imgfolder)
         self.pltfolder = os.path.abspath(plotfolder)
-        self.getextractmatch()
 
-        self.checkfolders()
+        if validate_files:
+            self.getextractmatch()
+            self.checkfolders()
 
     def checkfolders(self):
         """
@@ -83,7 +84,7 @@ class Extractor():
 
         # Open the first dataset
         fname = self.iarr[0]
-        with ncdf.Dataset(fname, 'r') as dset:
+        with nc.Dataset(fname, 'r') as dset:
             # read in useful variables
             self.Ratmo = dset.planet_rgas
             self.Cp = dset.planet_cp
@@ -123,7 +124,7 @@ class Extractor():
             self.lon_h = dset.variables["lon_h"][:]
 
             self.lat_u = dset.variables["lat_u"][:]
-            self.lon_v = dset.variables["lon_u"][:]
+            self.lon_u = dset.variables["lon_u"][:]
 
             self.lat_v = dset.variables["lat_v"][:]
             self.lon_v = dset.variables["lon_v"][:]
@@ -147,6 +148,8 @@ class Extractor():
             self.varlist = varlist
             self.species = species
 
+        self.set_shape_factors()
+
         if get_time:
             self.setup_time()
         else:
@@ -162,7 +165,7 @@ class Extractor():
 
         # loop through all the variables and check if
         # it matches the shape
-        with ncdf.Dataset(fname, 'r') as dset:
+        with nc.Dataset(fname, 'r') as dset:
             for var in dset.variables.keys():
                 recheck = re.match(matchphrase, var)
 
@@ -187,14 +190,13 @@ class Extractor():
         self.tarr = np.zeros(self.nt)
         for i, ti in enumerate(self.iarr):
             fname = self.iarr[i]
-            with ncdf.Dataset(fname, 'r') as dset:
+            with nc.Dataset(fname, 'r') as dset:
                 self.tarr[i] = dset.variables['time'][0]
 
     def set_shape_factors(self):
         '''
             Set these for calculating Ertel's PV on isobaric surfaces
             Should be called right after setup_extract
-
         '''
         self.m_h = np.zeros((self.gridnk + 1, self.gridnj + 1))
         self.n_h = np.zeros((self.gridnk + 1, self.gridnj + 1))
@@ -239,7 +241,7 @@ class Extractor():
             Get the variables for a given output i
         '''
         fname = self.iarr[i]
-        with ncdf.Dataset(fname, 'r') as dset:
+        with nc.Dataset(fname, 'r') as dset:
             if self.tarr[i] == -1:
                 self.tarr[i] = dset.variables['time'][0]
 
@@ -276,6 +278,19 @@ class Extractor():
                 except BaseException:
                     pass
         return vars
+
+    def get_attrs(self, i, attrs=None):
+        '''
+            Gets a specific attribute (or all attributes from a given extract
+        '''
+        fname = self.iarr[i]
+        with nc.Dataset(fname, 'r') as dset:
+            if attrs is None:
+                attrs = dset.ncattrs
+            elif isinstance(attrs, str):
+                attrs = [attrs]
+
+            return [getattr(dset, attr) for attr in attrs]
 
     def get_ertel_pv(self, var):
         '''
