@@ -3,6 +3,7 @@ import netCDF4 as nc
 import os
 import re
 import glob
+from collections.abc import Iterable
 
 
 class Extractor():
@@ -92,7 +93,10 @@ class Extractor():
             self.xhe = dset.planet_x_he
             self.x3 = dset.planet_x_3
             self.cpr = self.Cp / self.Ratmo
-            self.p0 = dset.grid_press0
+            try:
+                self.p0 = dset.grid_press0
+            except AttributeError:
+                self.p0 = dset.planet_p0
 
             # Get info about gridbox
             self.gridni = dset.grid_ni  # nLongitudes
@@ -106,10 +110,16 @@ class Extractor():
             self.gridlontop = dset.grid_globe_lontop
 
             # vertical coordinates
-            self.sigmatheta = dset.variables['sigmatheta_h'][:]
-            self.sigmatheta_u = dset.variables['sigmatheta_u'][:]
-            self.sigmatheta_v = dset.variables['sigmatheta_v'][:]
-            self.sigmatheta_pv = dset.variables['sigmatheta_pv'][:]
+            try:
+                self.sigmatheta = dset.variables['sigmatheta_h'][:]
+                self.sigmatheta_u = dset.variables['sigmatheta_u'][:]
+                self.sigmatheta_v = dset.variables['sigmatheta_v'][:]
+                self.sigmatheta_pv = dset.variables['sigmatheta_pv'][:]
+            except KeyError:
+                self.p = dset.variables['p_h'][:]
+                self.p_h = dset.variables['p_h'][:]
+                self.p_u = dset.variables['p_u'][:]
+                self.p_pv = dset.variables['p_pv2'][:]
 
             # useful for recalculating Ertel's PV
             self.omega = dset.planet_omega_sidereal
@@ -129,10 +139,17 @@ class Extractor():
             self.lat_v = dset.variables["lat_v"][:]
             self.lon_v = dset.variables["lon_v"][:]
 
-            self.lat_pv = dset.variables["lat_pv"][:]
-            self.lon_pv = dset.variables["lon_pv"][:]
+            try:
+                self.lat_pv = dset.variables["lat_pv"][:]
+                self.lon_pv = dset.variables["lon_pv"][:]
+            except KeyError:
+                self.lat_pv = dset.variables["lat_pv2"][:]
+                self.lon_pv = dset.variables["lon_pv2"][:]
 
-            self.gravity = np.array(dset.variables['gravity'])
+            try:
+                self.gravity = np.array(dset.variables['gravity'])
+            except KeyError:
+                self.gravity = np.array(dset.variables['gravity2'])
             self.gave = self.gravity.mean()
 
             # set up sizes
@@ -235,6 +252,31 @@ class Extractor():
 
             f_pv[:, j, :] = 2. * self.omega * np.sin(lat_pv)
             f_h[:, j, :] = 2. * self.omega * np.sin(lat_h)
+
+    def get_variable_at_time(self, var, i):
+        fname = self.iarr[i]
+
+        with nc.Dataset(fname, 'r') as dset:
+            if var not in dset.variables:
+                raise KeyError(f'Dataset does not contain {var} at time {i} => {self.tarr[i]}')
+            if dset.variables[var].dimensions[0] == 'time':
+                variable = dset.variables[var][0, :]
+            else:
+                variable = dset.variables[:]
+        return variable
+
+    def get_variable(self, var, time=None):
+        if time is None:
+            time = range(len(self.iarr))
+        if time is not None and isinstance(time, int):
+            return self.get_variable_at_time(var, time)
+        elif isinstance(time, Iterable):
+            var = []
+            for ix in time:
+                var.append(self.get_variable_at_time(var, ix))
+            return np.asarray(var)
+        else:
+            raise ValueError(f"time must be None, integer or a list of time values. Got {time}")
 
     def get_vars(self, i):
         '''
