@@ -1,7 +1,6 @@
 import numpy as np
 import netCDF4 as nc
 import os
-import re
 import glob
 from collections.abc import Iterable
 
@@ -20,24 +19,16 @@ class Extractor():
 
     """
 
-    def __init__(self, imgfolder=".", plotfolder="plots/", validate_files=True):
+    def __init__(self, imgfolder=".", validate_files=True):
         """
         Initializes the extractor
         """
         self.imgfolder = os.path.abspath(imgfolder)
-        self.pltfolder = os.path.abspath(plotfolder)
 
         if validate_files:
             self.getextractmatch()
-            self.checkfolders()
 
-    def checkfolders(self):
-        """
-        Makes sure the folder exists. Called by default.
-        """
-        if not os.path.exists(self.pltfolder):
-            os.makedirs(self.pltfolder)
-            print("Folder was created: ", self.pltfolder)
+        self.setup_extract()
 
     def getextractmatch(self):
         """
@@ -73,10 +64,7 @@ class Extractor():
 
         self.iarr = np.asarray(self.iarr)
 
-    def setup_extract(self, auto_vars=True, get_time=True,
-                      varlist=['t', 'p', 'pdry', 'rho'],
-                      species=[],
-                      phase=['liquid', 'rain', 'vapor', 'snow', 'solid']):
+    def setup_extract(self):
         '''
             Initialize the bookkeeping and get basic properties of the
             outputs (e.g., thermo variables, grid sizes, extents etc.)
@@ -155,48 +143,9 @@ class Extractor():
             # set up sizes
             self.nt = self.iarr.shape[0]
 
-        # Automatically retrieve variables
-        # This is slow if there are a lot of variables.
-        # Can be sped up if you only need a few variables for analysis
-        # by specifying
-        if auto_vars:
-            self.varlist, self.species = self.get_variables(fname)
-        else:
-            self.varlist = varlist
-            self.species = species
-
         self.set_shape_factors()
 
-        if get_time:
-            self.setup_time()
-        else:
-            self.tarr = (-1.) * np.ones(self.nt)
-
-    def get_variables(self, fname):
-        # Create the REGEX phrase for matching species names
-        matchphrase = "(.*)_(solid|liquid|rain|snow|vapor)([_tendency]*)"
-
-        # Initialize empty varlist and species arrays
-        species = []
-        varlist = []
-
-        # loop through all the variables and check if
-        # it matches the shape
-        with nc.Dataset(fname, 'r') as dset:
-            for var in dset.variables.keys():
-                recheck = re.match(matchphrase, var)
-
-                # if it matches the species name, add it to species var
-                if recheck:
-                    spec = recheck.group(1)
-                    if spec not in species:
-                        species.append(spec)
-                else:
-                    # if it's a 4-D variable (time, z, y, x), then add it
-                    if len(dset.variables[var].shape) == 4:
-                        varlist.append(var)
-
-        return varlist, species
+        self.setup_time()
 
     def setup_time(self):
         '''
@@ -253,16 +202,21 @@ class Extractor():
             f_pv[:, j, :] = 2. * self.omega * np.sin(lat_pv)
             f_h[:, j, :] = 2. * self.omega * np.sin(lat_h)
 
-    def get_variable_at_time(self, var, i):
-        fname = self.iarr[i]
+    def get_variable_at_time(self, var, time):
+        fname = self.iarr[time]
 
         with nc.Dataset(fname, 'r') as dset:
+            if var == 'ertel_pv':
+                return self.get_ertel_pv(time)
+
             if var not in dset.variables:
-                raise KeyError(f'Dataset does not contain {var} at time {i} => {self.tarr[i]}')
+                raise KeyError(f'Dataset does not contain {var} at time {time} => {self.tarr[time]}')
+
             if dset.variables[var].dimensions[0] == 'time':
                 variable = dset.variables[var][0, :]
             else:
                 variable = dset.variables[:]
+
         return variable
 
     def get_variable(self, var, time=None):
@@ -278,54 +232,11 @@ class Extractor():
         else:
             raise ValueError(f"time must be None, integer or a list of time values. Got {time}")
 
-    def get_vars(self, i):
-        '''
-            Get the variables for a given output i
-        '''
-        fname = self.iarr[i]
-        with nc.Dataset(fname, 'r') as dset:
-            if self.tarr[i] == -1:
-                self.tarr[i] = dset.variables['time'][0]
-
-            vars = {}
-            # base EPIC dynamics variables
-            for j, var in enumerate(self.varlist):
-                vars[var] = np.array(dset.variables[var][0, :, :, :])
-
-            # cloud variables
-            for i, spec in enumerate(self.species):
-                for phase in ['solid', 'liquid', 'rain', 'vapor', 'snow']:
-                    var = spec + "_" + phase
-                    vars[var] = np.array(dset.variables[var][0, :, :, :])
-
-                    # moist convection variables
-                    try:
-                        var = var + "_tendency"
-                        vars[var] = np.array(dset.variables[var][:, :, :])
-                    except BaseException:
-                        pass
-
-                # moist convection variables
-                try:
-                    var = spec + "_pbase"
-                    vars[var] = np.array(dset.variables[var][:, :])
-                    var = spec + "_cwf"
-                    vars[var] = np.array(dset.variables[var][0, :, :, :])
-                    var = spec + "_lambda_mc"
-                    vars[var] = np.array(dset.variables[var][0, :, :, :])
-                    var = spec + "_mb_mc"
-                    vars[var] = np.array(dset.variables[var][0, :, :, :])
-                    var = spec + "_dadt"
-                    vars[var] = np.array(dset.variables[var][0, :, :, :])
-                except BaseException:
-                    pass
-        return vars
-
-    def get_attrs(self, i, attrs=None):
+    def get_attrs(self, time, attrs=None):
         '''
             Gets a specific attribute (or all attributes from a given extract
         '''
-        fname = self.iarr[i]
+        fname = self.iarr[time]
         with nc.Dataset(fname, 'r') as dset:
             if attrs is None:
                 attrs = dset.ncattrs
@@ -334,14 +245,14 @@ class Extractor():
 
             return [getattr(dset, attr) for attr in attrs]
 
-    def get_ertel_pv(self, var):
+    def get_ertel_pv(self, time):
         '''
             Get Ertel's PV in the sigma portion of the zeta coordinate.
             Calculates the (d theta/d zeta) term and multiplies the
             PV from EPIC to get the actual Ertel's PV on isobaric surfaces
         '''
-        pv = var["pv"][:]
-        theta = var["theta"][:]
+        pv = self.get_variable_at_time('pv', time)
+        theta = self.get_variable_at_time('theta', time)
         sigth = self.sigmatheta_pv
 
         ertel_pv = pv.copy()
@@ -375,6 +286,4 @@ class Extractor():
         dthetadsgth = dth[:, 1:, :] / dsgth[:, 1:, :]
         ertel_pv[1:-1, 1:, :] = pv[1:-1, 1:, :] * dthetadsgth
 
-        var["ertel_pv"] = ertel_pv
-
-        return var
+        return ertel_pv
