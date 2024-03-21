@@ -127,6 +127,7 @@ class EPIC_CAPE:
         if not os.path.exists(savepath):
             raise OSError(f"savefile not found at {savepath}")
         data = np.load(savepath)
+        assert len(self.CAPE) == len(data['CAPE']), "Incorrect size! Re-run calculation"
         self.CAPE = data['CAPE']
         self.CIN = data['CIN']
         self.pLCL = data['pLCL']
