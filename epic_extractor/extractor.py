@@ -57,7 +57,7 @@ class Extractor():
         if not os.path.exists(resfolder):
             return
 
-        self.iarr = self.iarr[:start]
+        self.iarr = self.iarr[:start].tolist()
         files = sorted(glob.glob(resfolder + "/extract*.nc"))
         for file in files:
             self.iarr.append(file)
@@ -225,10 +225,10 @@ class Extractor():
         if time is not None and isinstance(time, int):
             return self.get_variable_at_time(var, time)
         elif isinstance(time, Iterable):
-            var = []
+            data = []
             for ix in time:
-                var.append(self.get_variable_at_time(var, ix))
-            return np.asarray(var)
+                data.append(self.get_variable_at_time(var, ix))
+            return np.asarray(data)
         else:
             raise ValueError(f"time must be None, integer or a list of time values. Got {time}")
 
@@ -239,11 +239,11 @@ class Extractor():
         fname = self.iarr[time]
         with nc.Dataset(fname, 'r') as dset:
             if attrs is None:
-                attrs = dset.ncattrs
+                attrs = dset.ncattrs()
             elif isinstance(attrs, str):
                 attrs = [attrs]
 
-            return [getattr(dset, attr) for attr in attrs]
+            return {attr: getattr(dset, attr) for attr in attrs}
 
     def get_ertel_pv(self, time):
         '''
