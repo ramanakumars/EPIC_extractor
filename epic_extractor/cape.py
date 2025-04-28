@@ -9,8 +9,20 @@ import multiprocessing
 import signal
 import tqdm
 import os
+import logging
 
 Cpw = 4218.
+LOG_INTERVAL = 5
+
+logger = logging.getLogger()
+
+
+class LoggerTqdm(tqdm.tqdm):
+    def display(self, msg=None, pos=None):
+        if self.n % LOG_INTERVAL == 0:
+            logger.info(str(self))
+
+        return super().display(msg, pos)
 
 
 @dataclass
@@ -44,7 +56,7 @@ class EPIC_CAPE:
         self.pEL = np.zeros((self.extractor.tarr.size, self.extractor.lat_h.size, self.extractor.lon_h.size))
 
     def get_CAPE_CIN(self, num_procs=1, pbase=6000.e2, species='H_2O'):
-        for n, t in enumerate(tqdm.tqdm(self.extractor.tarr, desc='Getting CAPE parameters')):
+        for n, t in enumerate(LoggerTqdm(self.extractor.tarr, desc='Getting CAPE parameters')):
             CAPE, CIN, pLCL, pLFC, pEL = self.get_CAPE_vars(n, num_procs, pbase, species, tqdm_attrs={'disable': True, 'dynamic_ncols': True})
             self.CAPE[n] = CAPE
             self.CIN[n] = CIN
@@ -59,10 +71,9 @@ class EPIC_CAPE:
         else:
             raise ValueError(f"{species} not implemented")
 
-        var = self.extractor.get_vars(n)
-        pfull = var["p"]
-        T = var["t"]
-        vapor = var[f"{species}_vapor"]
+        pfull = self.extractor.get_variable('p', n)
+        T = self.extractor.get_variable('t', n)
+        vapor = self.extractor.get_variable(f"{species}_vapor", n)
 
         CAPE = np.zeros((self.extractor.lat_h.size, self.extractor.lon_h.size))
         CIN = np.zeros((self.extractor.lat_h.size, self.extractor.lon_h.size))
@@ -80,37 +91,36 @@ class EPIC_CAPE:
                 cp_k0 = self.planet.return_cp(pij[k0], Tij[k0])
                 inpargs.append([pij, Tij, qij, k0, cp_k0, self.extractor.Ratmo, self.extractor.gave, Rw, Lv])
 
-        inputs = tqdm.tqdm(inpargs, desc='Calculating CAPE', **tqdm_attrs)
+        with LoggerTqdm(inpargs, desc='Calculating CAPE', **tqdm_attrs) as inputs:
+            if num_procs == 1:
+                for jj, args in enumerate(inputs):
+                    Tparcel, Tvparcel, CAPEi, CINi, bi, plcli, plfci, peli = do_CAPE(*args)
+                    j, i = np.unravel_index(jj, (self.extractor.lat_h.size, self.extractor.lon_h.size))
+                    CAPE[j, i] = CAPEi
+                    CIN[j, i] = CINi
+                    pLCL[j, i] = plcli
+                    pLFC[j, i] = plfci
+                    pEL[j, i] = peli
+            else:
+                with multiprocessing.Pool(processes=num_procs, initializer=initializer) as pool:
+                    try:
+                        for jj, result in enumerate(pool.starmap(do_CAPE, inputs, chunksize=500)):
+                            j, i = np.unravel_index(jj, (self.extractor.lat_h.size, self.extractor.lon_h.size))
+                            CAPE[j, i] = result[2]
+                            CIN[j, i] = result[3]
+                            pLCL[j, i] = result[5]
+                            pLFC[j, i] = result[6]
+                            pEL[j, i] = result[7]
 
-        if num_procs == 1:
-            for jj, args in enumerate(inputs):
-                Tparcel, Tvparcel, CAPEi, CINi, bi, plcli, plfci, peli = do_CAPE(*args)
-                j, i = np.unravel_index(jj, (self.extractor.lat_h.size, self.extractor.lon_h.size))
-                CAPE[j, i] = CAPEi
-                CIN[j, i] = CINi
-                pLCL[j, i] = plcli
-                pLFC[j, i] = plfci
-                pEL[j, i] = peli
-        else:
-            with multiprocessing.Pool(processes=num_procs, initializer=initializer) as pool:
-                try:
-                    for jj, result in enumerate(pool.starmap(do_CAPE, inputs, chunksize=500)):
-                        j, i = np.unravel_index(jj, (self.extractor.lat_h.size, self.extractor.lon_h.size))
-                        CAPE[j, i] = result[2]
-                        CIN[j, i] = result[3]
-                        pLCL[j, i] = result[5]
-                        pLFC[j, i] = result[6]
-                        pEL[j, i] = result[7]
+                        pool.close()
+                    except KeyboardInterrupt:
+                        pool.terminate()
+                        pool.join()
+                        return
+                    except Exception:
+                        raise
 
-                    pool.close()
-                except KeyboardInterrupt:
-                    pool.terminate()
                     pool.join()
-                    return
-                except Exception:
-                    raise
-
-                pool.join()
 
         return CAPE, CIN, pLCL, pLFC, pEL
 
@@ -122,17 +132,18 @@ class EPIC_CAPE:
                  pEL=self.pEL,
                  pLFC=self.pLFC)
 
-    def load(self, filename):
+    def load(self, filename, suppress_warning=False):
         savepath = os.path.join(self.extractor.imgfolder, filename)
         if not os.path.exists(savepath):
             raise OSError(f"savefile not found at {savepath}")
         data = np.load(savepath)
-        assert len(self.CAPE) == len(data['CAPE']), "Incorrect size! Re-run calculation"
-        self.CAPE = data['CAPE']
-        self.CIN = data['CIN']
-        self.pLCL = data['pLCL']
-        self.pEL = data['pEL']
-        self.pLFC = data['pLFC']
+        if not suppress_warning:
+            assert len(self.CAPE) == len(data['CAPE']), "Incorrect size! Re-run calculation"
+        self.CAPE[:len(data['CAPE'])] = data['CAPE']
+        self.CIN[:len(data['CAPE'])] = data['CIN']
+        self.pLCL[:len(data['CAPE'])] = data['pLCL']
+        self.pEL[:len(data['CAPE'])] = data['pEL']
+        self.pLFC[:len(data['CAPE'])] = data['pLFC']
 
 
 def esat(T):
