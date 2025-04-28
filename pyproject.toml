@@ -28,3 +28,6 @@ version = { attr = "epic_extractor.version.__version__" }
 
 [project.urls]
 repository = "https://www.github.com/ramanakumars/epic_extractor"
+
+[project.scripts]
+interpolate_N2 = 'epic_extractor.tools.integrate_N2:extrapolate_Tp'
