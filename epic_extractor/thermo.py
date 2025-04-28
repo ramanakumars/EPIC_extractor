@@ -23,12 +23,13 @@ N_A = 6.02214199e23
 
 
 class Planet():
-    def __init__(self, xh2, xhe, x3, cpr, rgas, p0):
+    def __init__(self, xh2, xhe, x3, cpr, rgas, g=None, p0=1000e2):
         self.xh2 = xh2
         self.xhe = xhe
         self.x3 = x3
         self.cpr = cpr
         self.rgas = rgas
+        self.g = g
         self.p0 = p0
         self.kappa = 1. / self.cpr
 
@@ -36,7 +37,7 @@ class Planet():
 
     @classmethod
     def from_extract(cls, extract):
-        c = cls(extract.xh2, extract.xhe, extract.x3, extract.cpr, extract.Ratmo, extract.p0)
+        c = cls(extract.xh2, extract.xhe, extract.x3, extract.cpr, extract.Ratmo, p0=extract.p0)
 
         return c
 
