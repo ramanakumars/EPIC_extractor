@@ -1,4 +1,5 @@
 import numpy as np
+from collections.abc import Iterable
 
 
 R_GAS = 8.314472e+3
@@ -69,20 +70,27 @@ def get_brunt2(planet, pressure, temp, mu, g=22.67):
     rho = np.zeros_like(temp)
 
     for k, (p, t) in enumerate(zip(pressure, temp)):
-        rho[k] = get_density(planet, p, t, mu)
+        if isinstance(mu, Iterable):
+            rho[k] = get_density(planet, p, t, mu[k])
+        else:
+            rho[k] = get_density(planet, p, t, mu)
 
     Drho_Dp = np.gradient(rho) / np.gradient(pressure)
 
     for k, (p, t) in enumerate(zip(pressure, temp)):
+        if isinstance(mu, Iterable):
+            mu_k = mu[k]
+        else:
+            mu_k = mu
         cp = planet.return_cp(p, t)
         dp = 0.001 * p
         dT = 0.001 * t
 
-        drho_dp_T = (get_density(planet, p + dp, t, mu) -
-                     get_density(planet, p - dp, t, mu)) / (2 * dp)
+        drho_dp_T = (get_density(planet, p + dp, t, mu_k) -
+                     get_density(planet, p - dp, t, mu_k)) / (2 * dp)
 
-        drho_dT_p = (get_density(planet, p, t + dT, mu) -
-                     get_density(planet, p, t - dT, mu)) / (2 * dT)
+        drho_dT_p = (get_density(planet, p, t + dT, mu_k) -
+                     get_density(planet, p, t - dT, mu_k)) / (2 * dT)
 
         brunt2[k] = g * g * (Drho_Dp[k] - drho_dp_T +
                              (t / (cp * rho[k] * rho[k])) * drho_dT_p * drho_dT_p)

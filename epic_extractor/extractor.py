@@ -215,7 +215,7 @@ class Extractor():
             if dset.variables[var].dimensions[0] == 'time':
                 variable = dset.variables[var][0, :]
             else:
-                variable = dset.variables[:]
+                variable = dset.variables[var][:]
 
         return variable
 
