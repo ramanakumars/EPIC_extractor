@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools >= 61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["epic_extractor"]
+exclude = []
+namespaces = false
+
+[project]
+name = "epic_extractor"
+dynamic = ["version"]
+license = { file = 'LICENSE' }
+description = 'Analysis package for the EPIC atmospheric model'
+requires-python = ">=3.8"
+dependencies = [
+    'numpy>=1.21.0,<1.25.2',
+    'netcdf4'
+]
+authors = [
+    { name = 'Ramanakumar Sankar', email = 'ramanakumar.shankar@gmail.com' },
+]
+readme = "README.md"
+
+[tool.setuptools.dynamic]
+version = { attr = "epic_extractor.version.__version__" }
+
+[project.urls]
+repository = "https://www.github.com/ramanakumars/epic_extractor"
+
+[project.scripts]
+interpolate_N2 = 'epic_extractor.tools.integrate_N2:extrapolate_Tp'
