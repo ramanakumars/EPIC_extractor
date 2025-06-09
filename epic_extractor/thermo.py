@@ -50,7 +50,7 @@ class Planet():
         a = np.zeros(8)
         z = np.zeros((3, 2))
         jmax = 50
-        jn = np.zeros(2, dtype=np.int)
+        jn = np.zeros(2, dtype=int)
 
         temp = np.zeros(MDIM_THERMO)
         tho = np.zeros(MDIM_THERMO)

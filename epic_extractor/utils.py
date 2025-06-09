@@ -69,11 +69,7 @@ def get_brunt2(planet, pressure, temp, mu, g=22.67):
     brunt2 = np.zeros_like(temp)
     rho = np.zeros_like(temp)
 
-    for k, (p, t) in enumerate(zip(pressure, temp)):
-        if isinstance(mu, Iterable):
-            rho[k] = get_density(planet, p, t, mu[k])
-        else:
-            rho[k] = get_density(planet, p, t, mu)
+    rho = get_density(planet, pressure, temp, mu)
 
     Drho_Dp = np.gradient(rho) / np.gradient(pressure)
 
