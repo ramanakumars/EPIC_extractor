@@ -90,4 +90,4 @@ def get_brunt2(planet, pressure, temp, mu, g=22.67):
 
         brunt2[k] = g * g * (Drho_Dp[k] - drho_dp_T +
                              (t / (cp * rho[k] * rho[k])) * drho_dT_p * drho_dT_p)
-    return brunt2, rho
+    return brunt2
