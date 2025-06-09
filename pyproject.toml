@@ -13,9 +13,9 @@ name = "epic_extractor"
 dynamic = ["version"]
 license = { file = 'LICENSE' }
 description = 'Analysis package for the EPIC atmospheric model'
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
-    'numpy>=1.21.0,<1.25.2',
+    'numpy>=2.2.4',
     'netcdf4'
 ]
 authors = [
