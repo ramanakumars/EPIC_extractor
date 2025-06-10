@@ -26,11 +26,11 @@ class Extractor():
         self.imgfolder = os.path.abspath(imgfolder)
 
         if validate_files:
-            self.getextractmatch()
+            self.iarr = self.getextractmatch(self.imgfolder)
 
         self.setup_extract()
 
-    def getextractmatch(self):
+    def getextractmatch(self, folder):
         """
         Loops through the folder and finds extract files. Called by
          default, unles getextractmatch=False
@@ -40,15 +40,14 @@ class Extractor():
         AssertionError : when no files were found
         """
 
-        files = sorted(glob.glob(self.imgfolder + "/extract*.nc"))
+        files = sorted(glob.glob(folder + "/extract*.nc"))
         iarr = []
         for file in files:
             iarr.append(file)
 
         assert len(iarr) > 0., "No files found!"
 
-        self.iarr = np.asarray(iarr)
-        self.iarrset = True
+        return iarr
 
     def add_restarts(self, resfolder, start=-1):
         """
@@ -58,9 +57,10 @@ class Extractor():
             return
 
         self.iarr = self.iarr[:start].tolist()
-        files = sorted(glob.glob(resfolder + "/extract*.nc"))
-        for file in files:
-            self.iarr.append(file)
+        try:
+            self.iarr.extend(self.getextractmatch(resfolder))
+        except FileNotFoundError:
+            pass
 
         self.iarr = np.asarray(self.iarr)
 
