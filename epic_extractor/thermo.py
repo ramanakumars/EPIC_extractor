@@ -1,6 +1,5 @@
 import numpy as np
 
-
 ''' adapted from EPIC
     see thermo_setup() and return_cp() in epic_funcs_diag.c
 '''
@@ -8,8 +7,8 @@ import numpy as np
 # constants
 MDIM_THERMO = 128
 NDIM_THERMO = 16
-THLO_THERMO = 20.
-THHI_THERMO = 600.
+THLO_THERMO = 20.0
+THHI_THERMO = 600.0
 CCOLN_THERMO = -2.105769
 CCPLN_THERMO = -1.666421
 CPRH2 = 2.5
@@ -22,7 +21,7 @@ K_B = 1.3806503e-23
 N_A = 6.02214199e23
 
 
-class Planet():
+class Planet:
     def __init__(self, xh2, xhe, x3, cpr, rgas, g=None, p0=1000e2):
         self.xh2 = xh2
         self.xhe = xhe
@@ -31,13 +30,20 @@ class Planet():
         self.rgas = rgas
         self.g = g
         self.p0 = p0
-        self.kappa = 1. / self.cpr
+        self.kappa = 1.0 / self.cpr
 
         self.thermo_setup()
 
     @classmethod
     def from_extract(cls, extract):
-        c = cls(extract.xh2, extract.xhe, extract.x3, extract.cpr, extract.Ratmo, p0=extract.p0)
+        c = cls(
+            extract.xh2,
+            extract.xhe,
+            extract.x3,
+            extract.cpr,
+            extract.Ratmo,
+            p0=extract.p0,
+        )
 
         return c
 
@@ -56,16 +62,7 @@ class Planet():
         tho = np.zeros(MDIM_THERMO)
         thp = np.zeros(MDIM_THERMO)
 
-        ndegeneracy = np.array([3., 1.])
-
-        # xh2 = self.xh2
-        # xhe = self.xhe
-        # x3 = self.x3
-
-        # if(xh2 > 0.):
-        #     cpr_out = (CPRH2*xh2 + CPRHE*xhe + CPR3*x3)/(xh2+xhe+x3)
-        # else:
-        #     cpr_out = self.cpr
+        ndegeneracy = np.array([3.0, 1.0])
 
         '''
             calculate hydrogen (H2) properties
@@ -74,49 +71,55 @@ class Planet():
 
         # reference temp and pressure used to define
         # the mean potential temperature
-        t0 = 1.
-        p0 = 1.e5
+        t0 = 1.0
+        p0 = 1.0e5
 
-        c1 = np.log(K_B * t0 / p0 * (2. * np.pi *
-                                     (M_PROTON / H_PLANCK) *
-                                     (K_B * t0 / H_PLANCK))**1.5)
-        c2 = np.log(9.)
+        c1 = np.log(
+            K_B
+            * t0
+            / p0
+            * (2.0 * np.pi * (M_PROTON / H_PLANCK) * (K_B * t0 / H_PLANCK)) ** 1.5
+        )
+        c2 = np.log(9.0)
         p = p0
         theta = 87.567
 
         for i in range(MDIM_THERMO):
-            temperature = 500. * (float(i + 1) / float(MDIM_THERMO))
-            if (temperature < 10.):
+            temperature = 500.0 * (float(i + 1) / float(MDIM_THERMO))
+            if temperature < 10.0:
                 ho = CPRH2 * temperature
                 hp = CPRH2 * temperature
                 pottempo = temperature
                 pottempp = temperature
-                a[0] = 1.
+                a[0] = 1.0
                 a[1] = 175.1340
-                a[2] = 0.
-                a[3] = 0.
-                a[4] = 0.
-                a[5] = 0.
-                a[6] = 0.
-                a[7] = 0.
-                ff = 0.
+                a[2] = 0.0
+                a[3] = 0.0
+                a[4] = 0.0
+                a[5] = 0.0
+                a[6] = 0.0
+                a[7] = 0.0
+                ff = 0.0
             else:
                 y = theta / temperature
-                y = np.min([y, 30.])
+                y = np.min([y, 30.0])
                 z = np.zeros((3, 2))
 
                 for j in range(1, jmax + 1):
                     jn[0] = 2 * j - 1
                     jn[1] = jn[0] - 1
                     for n in range(2):
-                        term = ndegeneracy[n] * (2 * jn[n] + 1) *\
-                            np.exp(-jn[n] * (jn[n] + 1) * y)
+                        term = (
+                            ndegeneracy[n]
+                            * (2 * jn[n] + 1)
+                            * np.exp(-jn[n] * (jn[n] + 1) * y)
+                        )
                         for m in range(3):
                             z[m, n] += term
-                            if (m < 2):
+                            if m < 2:
                                 term *= jn[n] * (jn[n] + 1)
 
-                    if ((j > 1) & (term < 1.e20)):
+                    if (j > 1) & (term < 1.0e20):
                         break
 
                 den = z[0, 0] + z[0, 1]
@@ -125,31 +128,50 @@ class Planet():
 
                 for n in range(2):
                     a[n + 1] = theta * z[1, n] / z[0, n]
-                    a[n + 3] = y * y * (z[0, n] * z[2, n] - z[1, n] *
-                                        z[1, n]) / (z[0, n] * z[0, n])
+                    a[n + 3] = (
+                        y
+                        * y
+                        * (z[0, n] * z[2, n] - z[1, n] * z[1, n])
+                        / (z[0, n] * z[0, n])
+                    )
                     a[n + 5] = np.log(z[0, n])
 
-                a[7] = (1. - a[0]) * a[3] + a[0] * a[4] + \
-                    (a[2] - a[1]) * y / temperature * \
-                    (z[1][1] * z[0][0] - z[0][1] * z[1][0]) / (den * den)
+                a[7] = (
+                    (1.0 - a[0]) * a[3]
+                    + a[0] * a[4]
+                    + (a[2] - a[1])
+                    * y
+                    / temperature
+                    * (z[1][1] * z[0][0] - z[0][1] * z[1][0])
+                    / (den * den)
+                )
 
-                ho = a[1] + CPRH2 * temperature - 2. * theta
+                ho = a[1] + CPRH2 * temperature - 2.0 * theta
                 hp = a[2] + CPRH2 * temperature
 
-                so = -np.log(p / p0) + 2.5 * np.log(temperature)\
-                    + 1.5 * np.log(2.0) + c1 + (ho + 2. *
-                                                theta) / temperature + a[5]
-                sp = -np.log(p / p0) + 2.5 * np.log(temperature)\
-                    + 1.5 * np.log(2.0) + c1 + hp / temperature + a[6]
+                so = (
+                    -np.log(p / p0)
+                    + 2.5 * np.log(temperature)
+                    + 1.5 * np.log(2.0)
+                    + c1
+                    + (ho + 2.0 * theta) / temperature
+                    + a[5]
+                )
+                sp = (
+                    -np.log(p / p0)
+                    + 2.5 * np.log(temperature)
+                    + 1.5 * np.log(2.0)
+                    + c1
+                    + hp / temperature
+                    + a[6]
+                )
 
-                pottempo = np.exp(
-                    0.4 * (so - c2 - 1.5 * np.log(2.0) - c1 - 2.5))
+                pottempo = np.exp(0.4 * (so - c2 - 1.5 * np.log(2.0) - c1 - 2.5))
                 pottempp = np.exp(0.4 * (sp - 1.5 * np.log(2.0) - c1 - 2.5))
 
-                ff = -(so - c2 - 1.5 * np.log(2.0) -
-                       c1 - 2.5 -
-                       ho / temperature)\
-                    + (sp - 1.5 * np.log(2.0) - c1 - 2.5 - hp / temperature)
+                ff = -(so - c2 - 1.5 * np.log(2.0) - c1 - 2.5 - ho / temperature) + (
+                    sp - 1.5 * np.log(2.0) - c1 - 2.5 - hp / temperature
+                )
                 ff *= temperature
                 temp[i] = temperature
                 tho[i] = pottempo
@@ -166,45 +188,50 @@ class Planet():
 
     def return_enthalpy(self, temperature, pressure):
         '''
-            assume that we are dealing with H/He atmosphere
-            and fpara is off
+        assume that we are dealing with H/He atmosphere
+        and fpara is off
         '''
         fp = 0.25
 
-        if (temperature < 20.):
+        if temperature < 20.0:
             enthalpy = self.cpr * temperature
-            fgibb = 0.
+            fgibb = 0.0
             uoup = 175.1340
 
-        elif (temperature > 500.):
-            ho = 1545.3790 + 3.5 * (temperature - 500.)
-            hp = 1720.3776 + 3.5 * (temperature - 500.)
+        elif temperature > 500.0:
+            ho = 1545.3790 + 3.5 * (temperature - 500.0)
+            hp = 1720.3776 + 3.5 * (temperature - 500.0)
 
-            enthalpy = (self.xh2) * ((1. - fp) * ho + fp * hp)\
-                + (self.xhe * 2.5 + self.x3 * 3.5) * temperature
-            fgibb = self.xh2 * 2.5 * (CCPLN_THERMO - CCOLN_THERMO) *\
-                temperature - self.xh2 * (hp - ho)
-            uoup = 0.
+            enthalpy = (self.xh2) * ((1.0 - fp) * ho + fp * hp) + (
+                self.xhe * 2.5 + self.x3 * 3.5
+            ) * temperature
+            fgibb = self.xh2 * 2.5 * (
+                CCPLN_THERMO - CCOLN_THERMO
+            ) * temperature - self.xh2 * (hp - ho)
+            uoup = 0.0
         else:
-            em = float(MDIM_THERMO - 1) *\
-                (temperature - self.t_grid[0]) /\
-                (self.t_grid[MDIM_THERMO - 1] - self.t_grid[0])
+            em = (
+                float(MDIM_THERMO - 1)
+                * (temperature - self.t_grid[0])
+                / (self.t_grid[MDIM_THERMO - 1] - self.t_grid[0])
+            )
             m = int(em)
 
-            if (m == MDIM_THERMO - 1):
+            if m == MDIM_THERMO - 1:
                 m -= 1
-                fract = 1.
+                fract = 1.0
             else:
-                fract = np.fmod(em, 1.)
+                fract = np.fmod(em, 1.0)
 
             thermo_vector = np.zeros(5)
             for j in range(5):
-                thermo_vector[j] = (1. - fract) * self.tharray[j][m]\
-                    + (fract) * self.tharray[j][m + 1]
+                thermo_vector[j] = (1.0 - fract) * self.tharray[j][m] + (
+                    fract
+                ) * self.tharray[j][m + 1]
 
-            enthalpy = (self.xh2) * ((1. - fp) * thermo_vector[0]
-                                     + (fp) * thermo_vector[1])\
-                + (self.xhe * 2.5 + self.x3 * 3.5) * temperature
+            enthalpy = (self.xh2) * (
+                (1.0 - fp) * thermo_vector[0] + (fp) * thermo_vector[1]
+            ) + (self.xhe * 2.5 + self.x3 * 3.5) * temperature
             fgibb = self.xh2 * thermo_vector[2]
             uoup = thermo_vector[4]
 
@@ -215,48 +242,54 @@ class Planet():
         return (enthalpy, fgibb, uoup)
 
     def return_cp(self, p, t):
-        epsilon = 1.e-6
+        epsilon = 1.0e-6
         deltaT = t * epsilon
 
         h2, _, _ = self.return_enthalpy(t + deltaT, p)
         h1, _, _ = self.return_enthalpy(t - deltaT, p)
 
-        cp = (h2 - h1) / (2. * deltaT)
+        cp = (h2 - h1) / (2.0 * deltaT)
 
         return cp
 
     def return_theta(self, p, t, fp=0.25):
-        if self.xh2 == 0.:
+        if self.xh2 == 0.0:
             # No hydrogen, so use standard definition of theta.
             theta = t * np.power(self.p0 / p, self.kappa)
         else:
             # Use mean theta as defined in Dowling et al (1998), to handle ortho/para hydrogen.
-            if t <= 20.:
+            if t <= 20.0:
                 theta = t
-            elif t > 500.:
-                cc = self.xh2 * 2.5 * ((1. - fp) * CCOLN_THERMO + fp * CCPLN_THERMO)
-                theta = np.exp(cc / self.cpr) * \
-                    np.power(t, ((3.5 * self.xh2 + 2.5 * self.xhe + 3.5 * self.x3) / self.cpr))
+            elif t > 500.0:
+                cc = self.xh2 * 2.5 * ((1.0 - fp) * CCOLN_THERMO + fp * CCPLN_THERMO)
+                theta = np.exp(cc / self.cpr) * np.power(
+                    t, ((3.5 * self.xh2 + 2.5 * self.xhe + 3.5 * self.x3) / self.cpr)
+                )
             else:
                 # 0 < em < MDIM_THERMO-1
-                em = (MDIM_THERMO - 1) * (t - self.t_grid[0]) / (self.t_grid[MDIM_THERMO - 1] - self.t_grid[0])
+                em = (
+                    (MDIM_THERMO - 1)
+                    * (t - self.t_grid[0])
+                    / (self.t_grid[MDIM_THERMO - 1] - self.t_grid[0])
+                )
                 m = int(em)
                 #  0 < m < MDIM_THERMO-2
-                if (m == MDIM_THERMO - 1):
+                if m == MDIM_THERMO - 1:
                     m -= 1
-                    fract = 1.
+                    fract = 1.0
                 else:
-                    fract = np.fmod(em, 1.)
+                    fract = np.fmod(em, 1.0)
 
                 thermo_vector = np.zeros(2)
                 for j in range(2):
-                    thermo_vector[j] = (1. - fract) *\
-                        self.theta_array[j][m] +\
-                        fract * self.theta_array[j][m + 1]
+                    thermo_vector[j] = (1.0 - fract) * self.theta_array[j][
+                        m
+                    ] + fract * self.theta_array[j][m + 1]
 
-                thetaln = (self.xh2) * \
-                    ((1. - fp) * np.log(thermo_vector[0]) + ((fp) * np.log(thermo_vector[1]))) +\
-                    (self.xhe * 2.5 + self.x3 * 3.5) * np.log(t) / self.cpr
+                thetaln = (self.xh2) * (
+                    (1.0 - fp) * np.log(thermo_vector[0])
+                    + ((fp) * np.log(thermo_vector[1]))
+                ) + (self.xhe * 2.5 + self.x3 * 3.5) * np.log(t) / self.cpr
 
                 theta = np.exp(thetaln)
             pp = pow(self.p0 / p, self.kappa)

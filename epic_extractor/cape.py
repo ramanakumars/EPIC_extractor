@@ -1,17 +1,19 @@
+import logging
+import multiprocessing
+import os
+import signal
+from dataclasses import dataclass, field
+
 import numpy as np
+import tqdm
+from scipy.integrate import odeint
 from scipy.interpolate import interp1d
 from scipy.optimize import fixed_point
-from scipy.integrate import odeint
-from dataclasses import dataclass, field
+
 from .extractor import Extractor
 from .thermo import Planet
-import multiprocessing
-import signal
-import tqdm
-import os
-import logging
 
-Cpw = 4218.
+Cpw = 4218.0
 LOG_INTERVAL = 5
 
 logger = logging.getLogger()
@@ -49,24 +51,64 @@ class EPIC_CAPE:
     def __init__(self, extractor: Extractor):
         self.extractor = extractor
         self.planet = Planet.from_extract(extractor)
-        self.CAPE = np.zeros((self.extractor.tarr.size, self.extractor.lat_h.size, self.extractor.lon_h.size))
-        self.CIN = np.zeros((self.extractor.tarr.size, self.extractor.lat_h.size, self.extractor.lon_h.size))
-        self.pLCL = np.zeros((self.extractor.tarr.size, self.extractor.lat_h.size, self.extractor.lon_h.size))
-        self.pLFC = np.zeros((self.extractor.tarr.size, self.extractor.lat_h.size, self.extractor.lon_h.size))
-        self.pEL = np.zeros((self.extractor.tarr.size, self.extractor.lat_h.size, self.extractor.lon_h.size))
+        self.CAPE = np.zeros(
+            (
+                self.extractor.tarr.size,
+                self.extractor.lat_h.size,
+                self.extractor.lon_h.size,
+            )
+        )
+        self.CIN = np.zeros(
+            (
+                self.extractor.tarr.size,
+                self.extractor.lat_h.size,
+                self.extractor.lon_h.size,
+            )
+        )
+        self.pLCL = np.zeros(
+            (
+                self.extractor.tarr.size,
+                self.extractor.lat_h.size,
+                self.extractor.lon_h.size,
+            )
+        )
+        self.pLFC = np.zeros(
+            (
+                self.extractor.tarr.size,
+                self.extractor.lat_h.size,
+                self.extractor.lon_h.size,
+            )
+        )
+        self.pEL = np.zeros(
+            (
+                self.extractor.tarr.size,
+                self.extractor.lat_h.size,
+                self.extractor.lon_h.size,
+            )
+        )
 
-    def get_CAPE_CIN(self, num_procs=1, pbase=6000.e2, species='H_2O'):
-        for n, t in enumerate(LoggerTqdm(self.extractor.tarr, desc='Getting CAPE parameters')):
-            CAPE, CIN, pLCL, pLFC, pEL = self.get_CAPE_vars(n, num_procs, pbase, species, tqdm_attrs={'disable': True, 'dynamic_ncols': True})
+    def get_CAPE_CIN(self, num_procs=1, pbase=6000.0e2, species='H_2O'):
+        for n, t in enumerate(
+            LoggerTqdm(self.extractor.tarr, desc='Getting CAPE parameters')
+        ):
+            CAPE, CIN, pLCL, pLFC, pEL = self.get_CAPE_vars(
+                n,
+                num_procs,
+                pbase,
+                species,
+                tqdm_attrs={'disable': True, 'dynamic_ncols': True},
+            )
             self.CAPE[n] = CAPE
             self.CIN[n] = CIN
             self.pLCL[n] = pLCL
             self.pLFC[n] = pLFC
             self.pEL[n] = pEL
 
-    def get_CAPE_vars(self, n, num_procs=1, pbase=6000.e2, species='H_2O', tqdm_attrs={}):
+    def get_CAPE_vars(
+        self, n, num_procs=1, pbase=6000.0e2, species='H_2O', tqdm_attrs={}
+    ):
         if species == 'H_2O':
-            Rw = 8314. / 18.
+            Rw = 8314.0 / 18.0
             Lv = 2.501e6 + 333.55e3
         else:
             raise ValueError(f"{species} not implemented")
@@ -87,25 +129,48 @@ class EPIC_CAPE:
                 pij = pfull[:, j, i][::-1]
                 Tij = T[:, j, i][::-1]
                 qij = vapor[:, j, i][::-1]
-                k0 = np.argmin((pij - pbase)**2.)
+                k0 = np.argmin((pij - pbase) ** 2.0)
                 cp_k0 = self.planet.return_cp(pij[k0], Tij[k0])
-                inpargs.append([pij, Tij, qij, k0, cp_k0, self.extractor.Ratmo, self.extractor.gave, Rw, Lv])
+                inpargs.append(
+                    [
+                        pij,
+                        Tij,
+                        qij,
+                        k0,
+                        cp_k0,
+                        self.extractor.Ratmo,
+                        self.extractor.gave,
+                        Rw,
+                        Lv,
+                    ]
+                )
 
         with LoggerTqdm(inpargs, desc='Calculating CAPE', **tqdm_attrs) as inputs:
             if num_procs == 1:
                 for jj, args in enumerate(inputs):
-                    Tparcel, Tvparcel, CAPEi, CINi, bi, plcli, plfci, peli = do_CAPE(*args)
-                    j, i = np.unravel_index(jj, (self.extractor.lat_h.size, self.extractor.lon_h.size))
+                    Tparcel, Tvparcel, CAPEi, CINi, bi, plcli, plfci, peli = do_CAPE(
+                        *args
+                    )
+                    j, i = np.unravel_index(
+                        jj, (self.extractor.lat_h.size, self.extractor.lon_h.size)
+                    )
                     CAPE[j, i] = CAPEi
                     CIN[j, i] = CINi
                     pLCL[j, i] = plcli
                     pLFC[j, i] = plfci
                     pEL[j, i] = peli
             else:
-                with multiprocessing.Pool(processes=num_procs, initializer=initializer) as pool:
+                with multiprocessing.Pool(
+                    processes=num_procs, initializer=initializer
+                ) as pool:
                     try:
-                        for jj, result in enumerate(pool.starmap(do_CAPE, inputs, chunksize=500)):
-                            j, i = np.unravel_index(jj, (self.extractor.lat_h.size, self.extractor.lon_h.size))
+                        for jj, result in enumerate(
+                            pool.starmap(do_CAPE, inputs, chunksize=500)
+                        ):
+                            j, i = np.unravel_index(
+                                jj,
+                                (self.extractor.lat_h.size, self.extractor.lon_h.size),
+                            )
                             CAPE[j, i] = result[2]
                             CIN[j, i] = result[3]
                             pLCL[j, i] = result[5]
@@ -125,12 +190,14 @@ class EPIC_CAPE:
         return CAPE, CIN, pLCL, pLFC, pEL
 
     def save(self, filename):
-        np.savez(os.path.join(self.extractor.imgfolder, filename),
-                 CAPE=self.CAPE,
-                 CIN=self.CIN,
-                 pLCL=self.pLCL,
-                 pEL=self.pEL,
-                 pLFC=self.pLFC)
+        np.savez(
+            os.path.join(self.extractor.imgfolder, filename),
+            CAPE=self.CAPE,
+            CIN=self.CIN,
+            pLCL=self.pLCL,
+            pEL=self.pEL,
+            pLFC=self.pLFC,
+        )
 
     def load(self, filename, suppress_warning=False):
         savepath = os.path.join(self.extractor.imgfolder, filename)
@@ -138,12 +205,14 @@ class EPIC_CAPE:
             raise OSError(f"savefile not found at {savepath}")
         data = np.load(savepath)
         if not suppress_warning:
-            assert len(self.CAPE) == len(data['CAPE']), "Incorrect size! Re-run calculation"
-        self.CAPE[:len(data['CAPE'])] = data['CAPE']
-        self.CIN[:len(data['CAPE'])] = data['CIN']
-        self.pLCL[:len(data['CAPE'])] = data['pLCL']
-        self.pEL[:len(data['CAPE'])] = data['pEL']
-        self.pLFC[:len(data['CAPE'])] = data['pLFC']
+            assert len(self.CAPE) == len(data['CAPE']), (
+                "Incorrect size! Re-run calculation"
+            )
+        self.CAPE[: len(data['CAPE'])] = data['CAPE']
+        self.CIN[: len(data['CAPE'])] = data['CIN']
+        self.pLCL[: len(data['CAPE'])] = data['pLCL']
+        self.pEL[: len(data['CAPE'])] = data['pEL']
+        self.pLFC[: len(data['CAPE'])] = data['pLFC']
 
 
 def esat(T):
@@ -151,7 +220,9 @@ def esat(T):
         es = 610.78 * np.exp(17.26939 * (T - 273.16) / (T - 35.86)) if T > 35.86 else 0
     else:
         es = np.zeros_like(T)
-        es[T > 35.86] = 610.78 * np.exp(17.26939 * (T[T > 35.86] - 273.16) / (T[T > 35.86] - 35.86))
+        es[T > 35.86] = 610.78 * np.exp(
+            17.26939 * (T[T > 35.86] - 273.16) / (T[T > 35.86] - 35.86)
+        )
 
     return es
 
@@ -162,12 +233,12 @@ def dewpoint(p, q, epsilon):
     e0 = 610.78
     e = q * p / (epsilon + q)
 
-    if (e > 0.):
+    if e > 0.0:
         a = T0 - T1 * (np.log(e / e0) / 17.26939)
-        b = 1. - (np.log(e / e0) / 17.26939)
+        b = 1.0 - (np.log(e / e0) / 17.26939)
         dp = a / b
     else:
-        dp = 0.
+        dp = 0.0
 
     return dp
 
@@ -189,7 +260,7 @@ def get_lcl(p, T, qH2O, k0, constants):
     def lcl_min(p):
         Td = dewpoint(p, q0, constants.epsilon)
         # print(p, Td)
-        return p0 * (Td / t0)**(constants.Cp / constants.Ratmo)
+        return p0 * (Td / t0) ** (constants.Cp / constants.Ratmo)
 
     # interpolate the Tp profile so we can call
     # it as a function of pressure
@@ -204,7 +275,7 @@ def get_lcl(p, T, qH2O, k0, constants):
     # zlcl = zp(np.log10(plcl))
     tlcl = Tp(np.log(plcl))
     # get the index of k corresponding to the LCL
-    klcl = np.argmin((p - plcl)**2.)
+    klcl = np.argmin((p - plcl) ** 2.0)
 
     return (plcl, tlcl, klcl)
 
@@ -221,22 +292,31 @@ def get_parcel_temp(p, T, k0, q0, plcl, klcl, constants):
     Xparcel = np.zeros_like(p)
     for k in range(0, klcl + 1):
         # dry lapse rate
-        Tparcel[k] = t0 * (p[k] / p0)**(constants.Ratmo / (constants.Cp))
+        Tparcel[k] = t0 * (p[k] / p0) ** (constants.Ratmo / (constants.Cp))
         Xparcel[k] = q0 / (constants.epsilon + q0)
 
     # we then correct the remaining amount based on
     # how much more of the atmosphere is dry
-    Tparcel[klcl + 1] = t0 * (plcl / p0)**(constants.Ratmo / constants.Cp)
+    Tparcel[klcl + 1] = t0 * (plcl / p0) ** (constants.Ratmo / constants.Cp)
 
     # calculate the moist adiabat wrt pressure
     def dTdp_moist(Ti, p):
         esi = esat(Ti)
         qi = esi / (p - esi) * constants.epsilon
         # This equation comes from [Bakhshaii2013]_.
-        dTdp = (1. / p) * ((constants.Ratmo * Ti + constants.Lv * qi) /
-                           ((constants.Cp + qi * Cpw) / (1. + qi) +
-                           (constants.Lv * constants.Lv * qi * constants.epsilon /
-                            (constants.Ratmo * Ti * Ti))))
+        dTdp = (1.0 / p) * (
+            (constants.Ratmo * Ti + constants.Lv * qi)
+            / (
+                (constants.Cp + qi * Cpw) / (1.0 + qi)
+                + (
+                    constants.Lv
+                    * constants.Lv
+                    * qi
+                    * constants.epsilon
+                    / (constants.Ratmo * Ti * Ti)
+                )
+            )
+        )
         return dTdp
 
     # integrate it for all points from klcl+1 to the end
@@ -253,13 +333,12 @@ def get_parcel_temp(p, T, k0, q0, plcl, klcl, constants):
     # get the virtual temperature of the parcel
     emoist = esat(Tmoist[:, 0])
     Xparcel[klcl:] = emoist / (pmoist)
-    Tvparcel = Tparcel / (1. - Xparcel * (1. - constants.epsilon))
+    Tvparcel = Tparcel / (1.0 - Xparcel * (1.0 - constants.epsilon))
 
     return (Tparcel, Tvparcel)
 
 
 def get_CAPE_CIN(p, k0, plcl, T, Tvparcel, q, constants):
-
     # get the virtual temperature of the atmosphere
     Tv = T * (q + constants.epsilon) / (constants.epsilon * (1 + q))
 
@@ -279,40 +358,40 @@ def get_CAPE_CIN(p, k0, plcl, T, Tvparcel, q, constants):
     # let's loop up from klcl to the top
     # and find the LFC
     # use a high resolution b to find the root
-    ptemp = np.linspace(np.log(plcl), np.log(plcl / 50.), 75)
+    ptemp = np.linspace(np.log(plcl), np.log(plcl / 50.0), 75)
     btemp = blogp(ptemp)
 
     plfc = -10
     pel = -10
-    b_crit = 15.  # critical buoyancy to avoid finding local zeros
+    b_crit = 15.0  # critical buoyancy to avoid finding local zeros
     for xi, lpi in enumerate(ptemp):
         # get the EL
-        if (btemp[xi] < -b_crit):
-            if ((plfc != -10) & (pel == -10)):
+        if btemp[xi] < -b_crit:
+            if (plfc != -10) & (pel == -10):
                 pel = np.exp(lpi)
                 break
         # get the LFC
-        if (btemp[xi] > b_crit):
-            if (plfc == -10):
+        if btemp[xi] > b_crit:
+            if plfc == -10:
                 plfc = np.exp(lpi)
 
     # integrate b to get the CAPE
     if (plfc == -10) or (pel == -10):
         # if there is no LFC, CAPE=0
-        CAPE = 0.
-        CIN = 0.
+        CAPE = 0.0
+        CIN = 0.0
     else:
         # integrate from zlfc to zel
         # to get the CAPE
         pCAPE = np.linspace(np.log(plfc), np.log(pel), 50)
         bCAPE = blogp(pCAPE)
-        bCAPE[bCAPE < 0.] = 0.
+        bCAPE[bCAPE < 0.0] = 0.0
         CAPE = -np.trapz(bCAPE, pCAPE)
 
         pCIN = np.linspace(np.log(p[k0]), np.log(plfc), 50)
         bCIN = blogp(pCIN)
-        bCIN[bCIN > 0.] = 0.
-        CIN = - np.trapz(bCIN, pCIN)
+        bCIN[bCIN > 0.0] = 0.0
+        CIN = -np.trapz(bCIN, pCIN)
 
     return CAPE, CIN, b, plfc, pel
 
@@ -320,9 +399,11 @@ def get_CAPE_CIN(p, k0, plcl, T, Tvparcel, q, constants):
 def do_CAPE(p, T, qH2O, k0, Cp, Ratmo, g, Rw, Lv):
     constants = Constants(Ratmo, Rw, g, Cp, Lv)
     plcl, tlcl, klcl = get_lcl(p, T, qH2O, k0, constants)
-    if np.isfinite(tlcl) and np.isfinite(plcl) and (plcl > 100.e2):
+    if np.isfinite(tlcl) and np.isfinite(plcl) and (plcl > 100.0e2):
         Tparcel, Tvparcel = get_parcel_temp(p, T, k0, qH2O[k0], plcl, klcl, constants)
-        CAPE, CIN, b, plfc, pel = get_CAPE_CIN(p, k0, plcl, T, Tvparcel, qH2O, constants)
+        CAPE, CIN, b, plfc, pel = get_CAPE_CIN(
+            p, k0, plcl, T, Tvparcel, qH2O, constants
+        )
     else:
         Tparcel = Tvparcel = b = np.zeros_like(p)
         CAPE = CIN = 0
