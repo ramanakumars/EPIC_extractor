@@ -16,7 +16,9 @@ description = 'Analysis package for the EPIC atmospheric model'
 requires-python = ">=3.10"
 dependencies = [
     'numpy>=2.2.4',
-    'netcdf4'
+    'netcdf4',
+    "tqdm>=4.67.1",
+    "scipy>=1.15.3",
 ]
 authors = [
     { name = 'Ramanakumar Sankar', email = 'ramanakumar.shankar@gmail.com' },
@@ -31,3 +33,11 @@ repository = "https://www.github.com/ramanakumars/epic_extractor"
 
 [project.scripts]
 interpolate_N2 = 'epic_extractor.tools.integrate_N2:extrapolate_Tp'
+
+[dependency-groups]
+dev = [
+    "myst-parser>=4.0.1",
+    "nbsphinx>=0.9.7",
+    "sphinx>=8.1.3",
+    "sphinx-book-theme>=1.1.4",
+]
