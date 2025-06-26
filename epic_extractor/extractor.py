@@ -37,7 +37,7 @@ class Extractor:
             iarr.append(file)
 
         if len(iarr) < 1:
-            raise FileNotFoundError("No files found!")
+            raise FileNotFoundError(f"No files found in path {folder}!")
 
         return np.asarray(iarr)
 
@@ -66,6 +66,7 @@ class Extractor:
         outputs (e.g., thermo variables, grid sizes, extents etc.)
         Should be called immediately after initialization of the class
         '''
+        self.setup_time()
 
         # Open the first dataset
         self.get_coordinates()
@@ -73,41 +74,29 @@ class Extractor:
         # set the shape factors to calculate Ertel PV
         self.set_shape_factors()
 
-        self.setup_time()
-
     def get_coordinates(self) -> None:
         """
         Get basic coordinates of the model and cache them for easy access
         """
         self.nt = len(self.files)
         # vertical coordinates
-        try:
-            self.sigmatheta = self.get_variables_at_time("sigmatheta_h", 0)
-            self.sigmatheta_u = self.get_variables_at_time("sigmatheta_u", 0)
-            self.sigmatheta_v = self.get_variables_at_time("sigmatheta_v", 0)
-            self.sigmatheta_pv = self.get_variables_at_time("sigmatheta_pv", 0)
-        except KeyError:
-            self.p = self.get_variables_at_time("p_h", 0)
-            self.p_h = self.get_variables_at_time("p_h", 0)
-            self.p_u = self.get_variables_at_time("p_u", 0)
-            self.p_pv = self.get_variables_at_time("p_pv2", 0)
+        self.sigmatheta = self.get_variable_at_time("sigmatheta_h", 0)
+        self.sigmatheta_u = self.get_variable_at_time("sigmatheta_u", 0)
+        self.sigmatheta_v = self.get_variable_at_time("sigmatheta_v", 0)
+        self.sigmatheta_pv = self.get_variable_at_time("sigmatheta_pv", 0)
 
         # Lat/lon grids for different variable types
-        self.lat_h = self.get_variables_at_time("lat_h", 0)
-        self.lon_h = self.get_variables_at_time("lon_h", 0)
+        self.lat_h = self.get_variable_at_time("lat_h", 0)
+        self.lon_h = self.get_variable_at_time("lon_h", 0)
 
-        self.lat_u = self.get_variables_at_time("lat_u", 0)
-        self.lon_u = self.get_variables_at_time("lon_u", 0)
+        self.lat_u = self.get_variable_at_time("lat_u", 0)
+        self.lon_u = self.get_variable_at_time("lon_u", 0)
 
-        self.lat_v = self.get_variables_at_time("lat_v", 0)
-        self.lon_v = self.get_variables_at_time("lon_v", 0)
+        self.lat_v = self.get_variable_at_time("lat_v", 0)
+        self.lon_v = self.get_variable_at_time("lon_v", 0)
 
-        try:
-            self.lat_pv = self.get_variables_at_time("lat_pv", 0)
-            self.lon_pv = self.get_variables_at_time("lon_pv", 0)
-        except KeyError:
-            self.lat_pv = self.get_variables_at_time("lat_pv2", 0)
-            self.lon_pv = self.get_variables_at_time("lon_pv2", 0)
+        self.lat_pv = self.get_variable_at_time("lat_pv", 0)
+        self.lon_pv = self.get_variable_at_time("lon_pv", 0)
 
     def setup_time(self) -> None:
         '''
@@ -132,28 +121,32 @@ class Extractor:
         Set these for calculating Ertel's PV on isobaric surfaces
         Should be called right after setup_extract
         '''
-        self.m_h = np.zeros((self.gridnk + 1, self.gridnj + 1))
-        self.n_h = np.zeros((self.gridnk + 1, self.gridnj + 1))
-        self.m_pv = np.zeros((self.gridnk + 1, self.gridnj + 1))
-        self.n_pv = np.zeros((self.gridnk + 1, self.gridnj + 1))
+        # useful for recalculating Ertel's PV
+        omega = self.get_attrs(0, "planet_omega_sidereal")["planet_omega_sidereal"]
+        grid_re = self.get_attrs(0, "grid_re")["grid_re"]
+        grid_rp = self.get_attrs(0, "grid_rp")["grid_rp"]
+        dln = np.radians(self.get_attrs(0, "grid_dln")["grid_dln"])
+        dlt = np.radians(self.get_attrs(0, "grid_dlt")["grid_dlt"])
+
+        gridnj = self.get_attrs(0, "grid_nj")["grid_nj"]
+        gridnk = self.get_attrs(0, "grid_nk")["grid_nk"]
+        gridni = self.get_attrs(0, "grid_ni")["grid_ni"]
+
+        self.m_h = np.zeros((gridnk + 1, gridnj + 1))
+        self.n_h = np.zeros((gridnk + 1, gridnj + 1))
+        self.m_pv = np.zeros((gridnk + 1, gridnj + 1))
+        self.n_pv = np.zeros((gridnk + 1, gridnj + 1))
 
         try:
-            self.gravity = self.get_variables_at_time("gravity", 0)
+            self.gravity = self.get_variable_at_time("gravity", 0)
         except KeyError:
-            self.gravity = self.get_variables_at_time("gravity2", 0)
+            self.gravity = self.get_variable_at_time("gravity2", 0)
         self.gave = self.gravity.mean()
 
-        # useful for recalculating Ertel's PV
-        omega = self.get_attrs(0, "planet_omega_sidereal")
-        grid_re = self.get_attrs(0, "grid_re")
-        grid_rp = self.get_attrs(0, "grid_rp")
-        dln = np.radians(self.get_attrs(0, "grid_dln"))
-        dlt = np.radians(self.get_attrs("grid_dlt", 0))
+        f_pv = np.zeros((gridnk + 1, gridnj + 1, gridni))
+        f_h = np.zeros((gridnk + 1, gridnj + 1, gridni))
 
-        f_pv = np.zeros((self.gridnk + 1, self.gridnj + 1, self.gridni))
-        f_h = np.zeros((self.gridnk + 1, self.gridnj + 1, self.gridni))
-
-        for j in range(self.gridnj + 1):
+        for j in range(gridnj + 1):
             lat_pv = np.radians(self.lat_pv[j])
             lat_h = np.radians(self.lat_h[j])
 
