@@ -4,7 +4,7 @@ import netCDF4 as nc
 import numpy as np
 import pytest
 
-from epic_extractor.extractor import Extractor
+from epicpy.extractor import Extractor
 
 root_folder = os.path.dirname(__file__)
 
@@ -25,6 +25,12 @@ class TestClass:
         with pytest.raises(FileNotFoundError):
             Extractor(os.path.join(root_folder, 'epic4_bad_folder/'))
 
+    def test_missing_restart_folder(self):
+        extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
+        extract.add_restarts(os.path.join(root_folder, 'epic4_test/restart_missing/'))
+        
+        assert len(extract.files) == 11
+
     def test_variable(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
 
@@ -34,6 +40,11 @@ class TestClass:
             variable = indset.variables["H_2O_vapor"][0, :]
 
         assert np.all(variable == extract.get_variable("H_2O_vapor", 0))
+    
+    def test_missing_variable(self):
+        extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
+        with pytest.raises(KeyError):
+            extract.get_variable("missing")
     
     def test_variable_multiple_times(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))

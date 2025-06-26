@@ -356,7 +356,7 @@ wheels = [
 ]
 
 [[package]]
-name = "epic-extractor"
+name = "epicpy"
 source = { editable = "." }
 dependencies = [
     { name = "netcdf4" },
