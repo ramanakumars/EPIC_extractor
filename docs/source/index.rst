@@ -15,4 +15,4 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
-   EPIC Extractor API <epic_extractor.rst>
+   EPICPy API <epicpy.rst>
