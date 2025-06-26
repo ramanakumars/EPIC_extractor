@@ -1,5 +1,6 @@
 import numpy as np
-from .extractor import Extractor
+
+from ..extractor.extractor import Extractor
 
 ''' adapted from EPIC
     see thermo_setup() and return_cp() in epic_funcs_diag.c
@@ -37,7 +38,9 @@ class Planet:
 
     @classmethod
     def from_extract(cls, extract: Extractor):
-        attrs = extract.get_attrs(0, ["planet_x_h2", "planet_x_he", "planet_x_3", "planet_cp", "planet_rgas"])
+        attrs = extract.get_attrs(
+            0, ["planet_x_h2", "planet_x_he", "planet_x_3", "planet_cp", "planet_rgas"]
+        )
         c = cls(
             attrs["planet_x_h2"],
             attrs["planet_x_he"],
