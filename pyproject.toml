@@ -36,6 +36,7 @@ interpolate_N2 = 'epic_extractor.tools.integrate_N2:extrapolate_Tp'
 
 [dependency-groups]
 dev = [
+    "coveralls>=4.0.1",
     "myst-parser>=4.0.1",
     "nbsphinx>=0.9.7",
     "pytest>=8.4.1",
