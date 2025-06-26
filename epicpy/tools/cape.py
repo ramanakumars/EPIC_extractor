@@ -10,8 +10,8 @@ from scipy.integrate import odeint
 from scipy.interpolate import interp1d
 from scipy.optimize import fixed_point
 
-from .extractor import Extractor
-from .thermo import Planet
+from ..extractor import Extractor
+from ..planet import Planet
 
 Cpw = 4218.0
 LOG_INTERVAL = 5

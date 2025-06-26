@@ -4,10 +4,10 @@ import numpy as np
 from scipy.integrate import solve_ivp
 from scipy.interpolate import PchipInterpolator
 
+from ..extractor.utils import get_brunt2
 from ..planet.planet import Planet
 from ..planet.planet_properties import PLANETS
 from ..planet.utils import get_planet_from_name
-from ..utils import get_brunt2
 
 mu_water = 18.0
 
@@ -74,12 +74,12 @@ def dTdlogp(
 
     The full function is from Dowling et al. 2006 (Appendix A), where we expand
     d(rho)/dp env into dT/d(log p) and ignore the dR/dT term in this expansion:
-        d(rho)/dp = d(p / RT)/dp = 1/(RT) - 1/(R^2 T) dR/d(log p) - 1 / (R T^2) dT / d(log p)
+    d(rho)/dp = d(p / RT)/dp = 1/(RT) - 1/(R^2 T) dR/d(log p) - 1 / (R T^2) dT / d(log p)
 
     :param logp: the natural log of the pressure [Pa]
     :param T: the temperature at this location [K]
 
-    :return: dT/d(log p) at this location [K]
+    :returns: dT/d(log p) at this location [K]
     """
     p = np.exp(logp)
 
