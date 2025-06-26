@@ -134,3 +134,6 @@ dmypy.json
 
 # ignore docs build
 docs/build/
+
+# ignore coverage tests
+htmlcov/
