@@ -134,6 +134,7 @@ dmypy.json
 
 # ignore docs build
 docs/build/
+docs/source/notebooks/
 
 # ignore coverage tests
 htmlcov/
