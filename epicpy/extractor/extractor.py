@@ -60,6 +60,8 @@ class Extractor:
 
         self.files = np.asarray(self.files)
 
+        self.setup_time()
+
     def setup_extract(self) -> None:
         '''
         Initialize the bookkeeping and get basic properties of the
@@ -78,7 +80,6 @@ class Extractor:
         """
         Get basic coordinates of the model and cache them for easy access
         """
-        self.nt = len(self.files)
         # vertical coordinates
         self.sigmatheta = self.get_variable_at_time("sigmatheta_h", 0)
         self.sigmatheta_u = self.get_variable_at_time("sigmatheta_u", 0)
@@ -103,24 +104,34 @@ class Extractor:
         Get all the timestamps for the outputs. Also finds the index/file correspondence
         when having restart simulations
         '''
+        self.nt = len(self.files)
+
         # set up sizes
-        self.tarr = []
+        self.time = []
         self.tarr_file = []
         self.tarr_index_in_file = []
         for i, ti in enumerate(self.files):
             fname = self.files[i]
             with nc.Dataset(fname, 'r') as dset:
-                self.tarr.append(dset.variables['time'][0])
+                self.time.append(float(dset.variables['time'][0]))
                 # the time dimension is only the first index in each file
                 # since EPIC 4 staggers one timestep per output file
                 self.tarr_file.append(fname)
                 self.tarr_index_in_file.append(0)
+
+        self.time = np.asarray(self.time)
+        self.tarr_file = np.asarray(self.tarr_file)
+        self.tarr_index_in_file = np.asarray(self.tarr_index_in_file)
 
     def set_shape_factors(self) -> None:
         '''
         Set these for calculating Ertel's PV on isobaric surfaces
         Should be called right after setup_extract
         '''
+        self.grid_nk = self.get_attrs(0, "grid_nk")["grid_nk"]
+        self.grid_nj = self.get_attrs(0, "grid_nj")["grid_nj"]
+        self.grid_ni = self.get_attrs(0, "grid_ni")["grid_ni"]
+
         # useful for recalculating Ertel's PV
         omega = self.get_attrs(0, "planet_omega_sidereal")["planet_omega_sidereal"]
         grid_re = self.get_attrs(0, "grid_re")["grid_re"]
@@ -128,14 +139,10 @@ class Extractor:
         dln = np.radians(self.get_attrs(0, "grid_dln")["grid_dln"])
         dlt = np.radians(self.get_attrs(0, "grid_dlt")["grid_dlt"])
 
-        gridnj = self.get_attrs(0, "grid_nj")["grid_nj"]
-        gridnk = self.get_attrs(0, "grid_nk")["grid_nk"]
-        gridni = self.get_attrs(0, "grid_ni")["grid_ni"]
-
-        self.m_h = np.zeros((gridnk + 1, gridnj + 1))
-        self.n_h = np.zeros((gridnk + 1, gridnj + 1))
-        self.m_pv = np.zeros((gridnk + 1, gridnj + 1))
-        self.n_pv = np.zeros((gridnk + 1, gridnj + 1))
+        self.m_h = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
+        self.n_h = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
+        self.m_pv = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
+        self.n_pv = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
 
         try:
             self.gravity = self.get_variable_at_time("gravity", 0)
@@ -143,10 +150,10 @@ class Extractor:
             self.gravity = self.get_variable_at_time("gravity2", 0)
         self.gave = self.gravity.mean()
 
-        f_pv = np.zeros((gridnk + 1, gridnj + 1, gridni))
-        f_h = np.zeros((gridnk + 1, gridnj + 1, gridni))
+        f_pv = np.zeros((self.grid_nk + 1, self.grid_nj + 1, self.grid_ni))
+        f_h = np.zeros((self.grid_nk + 1, self.grid_nj + 1, self.grid_ni))
 
-        for j in range(gridnj + 1):
+        for j in range(self.grid_nj + 1):
             lat_pv = np.radians(self.lat_pv[j])
             lat_h = np.radians(self.lat_h[j])
 
@@ -173,6 +180,15 @@ class Extractor:
             f_pv[:, j, :] = 2.0 * omega * np.sin(lat_pv)
             f_h[:, j, :] = 2.0 * omega * np.sin(lat_h)
 
+    def open_file(self, time: int) -> nc.Dataset:
+        """
+        Return a file pointer to an extract at a given time
+
+        :param time: the index of the output
+        :returns: the pointer to the netCDF4 Dataset structure for the file
+        """
+        return nc.Dataset(self.tarr_file[time], 'r')
+
     def get_variable_at_time(self, var: str, time: int) -> np.array:
         """
         Get a given variable for a given index
@@ -192,7 +208,7 @@ class Extractor:
 
             if var not in dset.variables:
                 raise KeyError(
-                    f'Dataset does not contain {var} at time {time} => {self.tarr[time]}'
+                    f'Dataset does not contain {var} at time {time} => {self.time[time]}'
                 )
 
             ind = self.tarr_index_in_file[time]
@@ -230,7 +246,7 @@ class Extractor:
                 f"time must be None, integer or a list of time values. Got {time}"
             )
 
-    def get_attrs(self, time, attrs=None):
+    def get_attrs(self, time: int, attrs: list[str] | str | None = None):
         '''
         Gets a specific attribute (or all attributes from a given extract
         '''
@@ -286,7 +302,7 @@ class Extractor:
 
         theta_av = theta.copy()
 
-        for ii in range(self.gridni):
+        for ii in range(self.grid_ni):
             # get the value of theta on the edges by interpolating
             theta_av[:, 1:, ii] = (
                 (theta[:, :-1, ii - 1] + theta[:, :-1, ii]) * (mm1 * nm1)
