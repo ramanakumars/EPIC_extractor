@@ -53,35 +53,35 @@ class EPIC_CAPE:
         self.planet = Planet.from_extract(extractor)
         self.CAPE = np.zeros(
             (
-                self.extractor.tarr.size,
+                self.extractor.time.size,
                 self.extractor.lat_h.size,
                 self.extractor.lon_h.size,
             )
         )
         self.CIN = np.zeros(
             (
-                self.extractor.tarr.size,
+                self.extractor.time.size,
                 self.extractor.lat_h.size,
                 self.extractor.lon_h.size,
             )
         )
         self.pLCL = np.zeros(
             (
-                self.extractor.tarr.size,
+                self.extractor.time.size,
                 self.extractor.lat_h.size,
                 self.extractor.lon_h.size,
             )
         )
         self.pLFC = np.zeros(
             (
-                self.extractor.tarr.size,
+                self.extractor.time.size,
                 self.extractor.lat_h.size,
                 self.extractor.lon_h.size,
             )
         )
         self.pEL = np.zeros(
             (
-                self.extractor.tarr.size,
+                self.extractor.time.size,
                 self.extractor.lat_h.size,
                 self.extractor.lon_h.size,
             )
@@ -89,7 +89,7 @@ class EPIC_CAPE:
 
     def get_CAPE_CIN(self, num_procs=1, pbase=6000.0e2, species='H_2O'):
         for n, t in enumerate(
-            LoggerTqdm(self.extractor.tarr, desc='Getting CAPE parameters')
+            LoggerTqdm(self.extractor.time, desc='Getting CAPE parameters')
         ):
             CAPE, CIN, pLCL, pLFC, pEL = self.get_CAPE_vars(
                 n,
