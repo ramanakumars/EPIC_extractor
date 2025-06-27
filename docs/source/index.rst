@@ -15,4 +15,6 @@ documentation for details.
    :maxdepth: 2
    :caption: Contents:
 
+   Analyzing EPIC 4 Outputs <notebooks/epic4.ipynb>
+
    EPICPy API <epicpy.rst>
