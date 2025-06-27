@@ -1,3 +1,3 @@
 from .planet import Planet
 
-__all__ = [Planet]
+__all__ = ["Planet"]
