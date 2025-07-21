@@ -76,6 +76,8 @@ class Extractor:
         # set the shape factors to calculate Ertel PV
         self.set_shape_factors()
 
+        self.Ratmo = self.get_attrs("planet_rgas", 0)
+
     def get_coordinates(self) -> None:
         """
         Get basic coordinates of the model and cache them for easy access
