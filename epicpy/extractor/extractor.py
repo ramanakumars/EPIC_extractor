@@ -128,16 +128,16 @@ class Extractor:
         Set these for calculating Ertel's PV on isobaric surfaces
         Should be called right after setup_extract
         '''
-        self.grid_nk = self.get_attrs(0, "grid_nk")["grid_nk"]
-        self.grid_nj = self.get_attrs(0, "grid_nj")["grid_nj"]
-        self.grid_ni = self.get_attrs(0, "grid_ni")["grid_ni"]
+        self.grid_nk = self.get_attrs("grid_nk", 0)
+        self.grid_nj = self.get_attrs("grid_nj", 0)
+        self.grid_ni = self.get_attrs("grid_ni", 0)
 
         # useful for recalculating Ertel's PV
-        omega = self.get_attrs(0, "planet_omega_sidereal")["planet_omega_sidereal"]
-        grid_re = self.get_attrs(0, "grid_re")["grid_re"]
-        grid_rp = self.get_attrs(0, "grid_rp")["grid_rp"]
-        dln = np.radians(self.get_attrs(0, "grid_dln")["grid_dln"])
-        dlt = np.radians(self.get_attrs(0, "grid_dlt")["grid_dlt"])
+        omega = self.get_attrs("planet_omega_sidereal", 0)
+        grid_re = self.get_attrs("grid_re", 0)
+        grid_rp = self.get_attrs("grid_rp", 0)
+        dln = np.radians(self.get_attrs("grid_dln", 0))
+        dlt = np.radians(self.get_attrs("grid_dlt", 0))
 
         self.m_h = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
         self.n_h = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
@@ -246,7 +246,7 @@ class Extractor:
                 f"time must be None, integer or a list of time values. Got {time}"
             )
 
-    def get_attrs(self, time: int, attrs: list[str] | str | None = None):
+    def get_attrs(self, attrs: list[str] | str | None = None, time: int = 0) -> dict | np.ndarray | float | int | str:
         '''
         Gets a specific attribute (or all attributes from a given extract
         '''
@@ -270,7 +270,10 @@ class Extractor:
                     )
                 output_attrs = list(set(output_attrs))
 
-            return {attr: getattr(dset, attr) for attr in output_attrs}
+            if len(output_attrs) == 1:
+                return getattr(dset, output_attrs[0])
+            else:
+                return {attr: getattr(dset, attr) for attr in output_attrs}
 
     def get_ertel_pv(self, time: int) -> np.array:
         '''
