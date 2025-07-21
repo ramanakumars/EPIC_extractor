@@ -17,8 +17,8 @@ class Extractor:
         Initializes the extractor and sets up the main parameters
         :param input_folder: folder containing extract.nc files
         """
-        self.imgfolder = os.path.abspath(imgfolder)
-        self.files = self.getextractmatch(self.imgfolder)
+        self.root_folder = os.path.abspath(imgfolder)
+        self.files = self.getextractmatch(self.root_folder)
         self.setup_extract()
 
     def getextractmatch(self, folder: str) -> np.array:

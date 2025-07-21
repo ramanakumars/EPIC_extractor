@@ -191,7 +191,7 @@ class EPIC_CAPE:
 
     def save(self, filename):
         np.savez(
-            os.path.join(self.extractor.imgfolder, filename),
+            os.path.join(self.extractor.root_folder, filename),
             CAPE=self.CAPE,
             CIN=self.CIN,
             pLCL=self.pLCL,
@@ -200,7 +200,7 @@ class EPIC_CAPE:
         )
 
     def load(self, filename, suppress_warning=False):
-        savepath = os.path.join(self.extractor.imgfolder, filename)
+        savepath = os.path.join(self.extractor.root_folder, filename)
         if not os.path.exists(savepath):
             raise OSError(f"savefile not found at {savepath}")
         data = np.load(savepath)
