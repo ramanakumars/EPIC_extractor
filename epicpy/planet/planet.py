@@ -39,7 +39,7 @@ class Planet:
     @classmethod
     def from_extract(cls, extract: Extractor):
         attrs = extract.get_attrs(
-            0, ["planet_x_h2", "planet_x_he", "planet_x_3", "planet_cp", "planet_rgas"]
+            ["planet_x_h2", "planet_x_he", "planet_x_3", "planet_cp", "planet_rgas"]
         )
         c = cls(
             attrs["planet_x_h2"],
