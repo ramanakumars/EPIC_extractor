@@ -41,32 +41,32 @@ class Extractor5(Extractor):
         """
         # vertical coordinates
         try:
-            self.sigmatheta = self.get_variables_at_time("hybrid_sigmatheta_h", 0)
-            self.sigmatheta_u = self.get_variables_at_time("hybrid_sigmatheta_u", 0)
-            self.sigmatheta_v = self.get_variables_at_time("hybrid_sigmatheta_v", 0)
-            self.sigmatheta_pv = self.get_variables_at_time("hybrid_sigmatheta_pv2", 0)
+            self.sigmatheta = self.get_variable_at_time("hybrid_sigmatheta_h", 0)
+            self.sigmatheta_u = self.get_variable_at_time("hybrid_sigmatheta_u", 0)
+            self.sigmatheta_v = self.get_variable_at_time("hybrid_sigmatheta_v", 0)
+            self.sigmatheta_pv = self.get_variable_at_time("hybrid_sigmatheta_pv2", 0)
         except KeyError:
-            self.p = self.get_variables_at_time("p_h", 0)
-            self.p_h = self.get_variables_at_time("p_h", 0)
-            self.p_u = self.get_variables_at_time("p_u", 0)
-            self.p_pv = self.get_variables_at_time("p_pv2", 0)
+            self.p = self.get_variable_at_time("p_h", 0)
+            self.p_h = self.get_variable_at_time("p_h", 0)
+            self.p_u = self.get_variable_at_time("p_u", 0)
+            self.p_pv = self.get_variable_at_time("p_pv2", 0)
 
         # Lat/lon grids for different variable types
-        self.lat_h = self.get_variables_at_time("lat_h", 0)
-        self.lon_h = self.get_variables_at_time("lon_h", 0)
+        self.lat_h = self.get_variable_at_time("lat_h", 0)
+        self.lon_h = self.get_variable_at_time("lon_h", 0)
 
-        self.lat_u = self.get_variables_at_time("lat_u", 0)
-        self.lon_u = self.get_variables_at_time("lon_u", 0)
+        self.lat_u = self.get_variable_at_time("lat_u", 0)
+        self.lon_u = self.get_variable_at_time("lon_u", 0)
 
-        self.lat_v = self.get_variables_at_time("lat_v", 0)
-        self.lon_v = self.get_variables_at_time("lon_v", 0)
+        self.lat_v = self.get_variable_at_time("lat_v", 0)
+        self.lon_v = self.get_variable_at_time("lon_v", 0)
 
         try:
-            self.lat_pv = self.get_variables_at_time("lat_pv", 0)
-            self.lon_pv = self.get_variables_at_time("lon_pv", 0)
+            self.lat_pv = self.get_variable_at_time("lat_pv", 0)
+            self.lon_pv = self.get_variable_at_time("lon_pv", 0)
         except KeyError:
-            self.lat_pv = self.get_variables_at_time("lat_pv2", 0)
-            self.lon_pv = self.get_variables_at_time("lon_pv2", 0)
+            self.lat_pv = self.get_variable_at_time("lat_pv2", 0)
+            self.lon_pv = self.get_variable_at_time("lon_pv2", 0)
 
     def setup_time(self) -> None:
         '''
@@ -74,13 +74,13 @@ class Extractor5(Extractor):
         when having restart simulations
         '''
         # set up sizes
-        self.tarr = []
+        self.time = []
         self.tarr_file = []
         self.tarr_index_in_file = []
         for i, ti in enumerate(self.files):
             fname = self.files[i]
             with nc.Dataset(fname, 'r') as dset:
-                self.tarr.extend(dset.variables['time'][:].tolist())
+                self.time.extend(dset.variables['time'][:].tolist())
                 # EPIC 5 outputs have multiple timesteps per output file
                 self.tarr_file.extend([fname] * len(dset.variables['time'][:]))
                 self.tarr_index_in_file.extend(

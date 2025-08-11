@@ -31,7 +31,7 @@ class Extractor:
         :raises FileNotFoundError: when no files were found
         """
 
-        files = sorted(glob.glob(os.path.join(folder, "extract*.nc")))
+        files = sorted(glob.glob(os.path.abspath(os.path.join(folder, "extract*.nc"))))
         iarr = []
         for file in files:
             iarr.append(file)
@@ -248,7 +248,9 @@ class Extractor:
                 f"time must be None, integer or a list of time values. Got {time}"
             )
 
-    def get_attrs(self, attrs: list[str] | str | None = None, time: int = 0) -> dict | np.ndarray | float | int | str:
+    def get_attrs(
+        self, attrs: list[str] | str | None = None, time: int = 0
+    ) -> dict | np.ndarray | float | int | str:
         '''
         Gets a specific attribute (or all attributes from a given extract
         '''
