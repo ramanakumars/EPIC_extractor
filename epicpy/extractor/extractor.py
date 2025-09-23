@@ -235,7 +235,7 @@ class Extractor:
         :raises ValueError: if the input time format is not correct
         """
         if time is None:
-            time = range(len(self.files))
+            time = range(len(self.time))
         if time is not None and isinstance(time, int):
             return self.get_variable_at_time(var, time)
         elif isinstance(time, Iterable):

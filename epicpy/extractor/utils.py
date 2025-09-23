@@ -1,17 +1,17 @@
-import numpy as np
 from collections.abc import Iterable
 
+import numpy as np
 
-R_GAS = 8.314472e+3
+R_GAS = 8.314472e3
 
 
 def fit_ellipse(v):
     '''
-        from NUMERICALLY  STABLE  DIRECT  LEAST  SQUARESFITTING  OF  ELLIPSES
-        (Halir and Flusser)
+    from NUMERICALLY  STABLE  DIRECT  LEAST  SQUARESFITTING  OF  ELLIPSES
+    (Halir and Flusser)
 
-        Used to fit ellipses to a set of 2-D points. Used in Hadland
-        et al. (2020) and Sankar et al. (2021)
+    Used to fit ellipses to a set of 2-D points. Used in Hadland
+    et al. (2020) and Sankar et al. (2021)
     '''
 
     x = v[:, 0]
@@ -32,33 +32,35 @@ def fit_ellipse(v):
     a = V[:, n]
 
     A, B, C, D, F, G = a
-    B = B / 2.
-    D = D / 2.
-    F = F / 2.
+    B = B / 2.0
+    D = D / 2.0
+    F = F / 2.0
 
-    disc = B**2. - A * C
+    disc = B**2.0 - A * C
     x0 = (C * D - B * F) / disc
     y0 = (A * F - B * D) / disc
 
-    a = np.sqrt((2 * (A * F**2. + C * D**2. + G * B**2. -
-                2 * B * D * F - A * C * G)) /
-                (disc * (np.sqrt((A - C)**2. + 4 * B**2) - (A + C))))
-    b = np.sqrt((2 * (A * F**2. + C * D**2. + G * B**2. -
-                2 * B * D * F - A * C * G)) /
-                (disc * (-np.sqrt((A - C)**2. + 4 * B**2) - (A + C))))
+    a = np.sqrt(
+        (2 * (A * F**2.0 + C * D**2.0 + G * B**2.0 - 2 * B * D * F - A * C * G))
+        / (disc * (np.sqrt((A - C) ** 2.0 + 4 * B**2) - (A + C)))
+    )
+    b = np.sqrt(
+        (2 * (A * F**2.0 + C * D**2.0 + G * B**2.0 - 2 * B * D * F - A * C * G))
+        / (disc * (-np.sqrt((A - C) ** 2.0 + 4 * B**2) - (A + C)))
+    )
 
-    if (B == 0):
-        if (A < C):
-            alpha = 0.
+    if B == 0:
+        if A < C:
+            alpha = 0.0
         else:
-            alpha = np.pi / 2.
+            alpha = np.pi / 2.0
     else:
-        alpha = np.arctan2((C - A - np.sqrt((A - C)**2. + B**2.)), B)
+        alpha = np.arctan2((C - A - np.sqrt((A - C) ** 2.0 + B**2.0)), B)
 
     return (x0, y0, a, b, alpha)
 
 
-def get_density(planet, p, t, mu):
+def get_density(p, t, mu):
     # temp = planet.return_temp(p, theta, mu)
     density = p * mu / (R_GAS * t)
 
@@ -69,7 +71,7 @@ def get_brunt2(planet, pressure, temp, mu, g=22.67):
     brunt2 = np.zeros_like(temp)
     rho = np.zeros_like(temp)
 
-    rho = get_density(planet, pressure, temp, mu)
+    rho = get_density(pressure, temp, mu)
 
     Drho_Dp = np.gradient(rho) / np.gradient(pressure)
 
@@ -82,12 +84,21 @@ def get_brunt2(planet, pressure, temp, mu, g=22.67):
         dp = 0.001 * p
         dT = 0.001 * t
 
-        drho_dp_T = (get_density(planet, p + dp, t, mu_k) -
-                     get_density(planet, p - dp, t, mu_k)) / (2 * dp)
+        drho_dp_T = (get_density(p + dp, t, mu_k) - get_density(p - dp, t, mu_k)) / (
+            2 * dp
+        )
 
-        drho_dT_p = (get_density(planet, p, t + dT, mu_k) -
-                     get_density(planet, p, t - dT, mu_k)) / (2 * dT)
+        drho_dT_p = (get_density(p, t + dT, mu_k) - get_density(p, t - dT, mu_k)) / (
+            2 * dT
+        )
 
-        brunt2[k] = g * g * (Drho_Dp[k] - drho_dp_T +
-                             (t / (cp * rho[k] * rho[k])) * drho_dT_p * drho_dT_p)
+        brunt2[k] = (
+            g
+            * g
+            * (
+                Drho_Dp[k]
+                - drho_dp_T
+                + (t / (cp * rho[k] * rho[k])) * drho_dT_p * drho_dT_p
+            )
+        )
     return brunt2
