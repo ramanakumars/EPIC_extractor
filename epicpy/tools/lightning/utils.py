@@ -7,7 +7,6 @@ from .constants import SPECIES_ID, SPECIES_PARAMETERS
 RAIN_INDEX = 0
 SNOW_INDEX = 1
 ICE_INDEX = 2
-LIQUID_INDEX = 3
 P0 = 1000e2  # reference pressure is 1bar
 
 H_2O_ID: int = SPECIES_ID["H_2O"]
@@ -216,7 +215,7 @@ def dQdt6(Ns, velocities, species, Qcoeffs, binbounds):
                                 * min(Qcoeffs[au], Qcoeffs[du])
                             )
                             dQitot = dQitot - abs(dQi)
-            dQidt[au, bu] = dQitot + 0
+            dQidt[au, bu] = dQitot
     Jc = np.sum(-Ns * velocities * dQidt)
     return Jc
 
@@ -235,7 +234,9 @@ def dEdt6(Ns, velocities, species, Qcoeffs, Ebreakdown, binbounds):
     Jc = np.zeros(len(Ns))
     for i in tqdm.tqdm(range(Jc.size)):
         # Jc[i] = dQdt6_vec(Ns[i], velocities[i], species[i], Qcoeffs[i], binbounds)
-        Jc[i] = dQdt6(Ns[i], velocities[i], species[i], Qcoeffs[i], binbounds)
+        Jc[i] = dQdt6(
+            Ns[i], velocities[i], species[i], Qcoeffs[i], binbounds
+        )
     # Jc = 0.0
     # for g in range(len(binbounds) - 1):
     #     for h in range(len(mus)):
@@ -284,9 +285,8 @@ def SVPs(P, T, mus_cond):
     return SVPs
 
 
-def dEtotal(
+def get_number_density_velocity(
     qice: np.ndarray,
-    qliquid: np.ndarray,
     qsnow: np.ndarray,
     qrain: np.ndarray,
     P: np.ndarray,
@@ -294,13 +294,12 @@ def dEtotal(
     species: list[str],
     Rdry: float = 3637.0,
 ):
-    bin_edges = np.geomspace(0.00001, 0.1, 41)
+    bin_edges = np.geomspace(0.00001, 10.48576, 41)
     bin_center = (bin_edges[1:] + bin_edges[:-1]) / 2
 
     nspecies, nk, nj, ni = qice.shape
 
     qice = qice.reshape(qice.shape[0], -1)
-    qliquid = qliquid.reshape(qice.shape[0], -1)
     qsnow = qsnow.reshape(qice.shape[0], -1)
     qrain = qrain.reshape(qice.shape[0], -1)
     P = P.flatten()
@@ -309,23 +308,21 @@ def dEtotal(
     Ebreakdown = 5.0 * P  # Rough approximation of the electric field for hydrogen
     rho_dry = P / (Rdry * T)
 
-    number_density = np.zeros((4 * nspecies, nk * nj * ni, len(bin_center)))
+    number_density = np.zeros((3 * nspecies, nk * nj * ni, len(bin_center)))
     velocity = np.zeros_like(number_density)
-    Q_coefficients = np.zeros((4 * nspecies, nk * nj * ni))
-    species_id = np.zeros((4 * nspecies, nk * nj * ni), dtype=int)
+    Q_coefficients = np.zeros((3 * nspecies, nk * nj * ni))
+    species_id = np.zeros((3 * nspecies, nk * nj * ni), dtype=int)
 
     for n, spec in enumerate(species):
         if spec not in SPECIES_PARAMETERS:
             raise KeyError(f"Constants for {spec} is not defined")
-        print(spec)
         species_parameters = SPECIES_PARAMETERS[spec]
 
         spec_id = SPECIES_ID[spec]
 
-        species_id[4 * n + ICE_INDEX] = spec_id
-        species_id[4 * n + LIQUID_INDEX] = spec_id
-        species_id[4 * n + RAIN_INDEX] = spec_id
-        species_id[4 * n + SNOW_INDEX] = spec_id
+        species_id[3 * n + ICE_INDEX] = spec_id
+        species_id[3 * n + RAIN_INDEX] = spec_id
+        species_id[3 * n + SNOW_INDEX] = spec_id
 
         # ========= ICE ======================== #
         rho_ice = rho_dry * qice[n]
@@ -337,8 +334,6 @@ def dEtotal(
             1 / species_parameters['ice']['beta']
         )
 
-        print(D_ice.min(), D_ice.max())
-
         # get the bin index corresponding to each (k, j, i) grid
         diff = np.linalg.outer(2.0 / D_ice, bin_center) - 1
         bin_idx = np.argmin(diff**2.0, axis=1)
@@ -348,9 +343,9 @@ def dEtotal(
         )
 
         # set the number density at these indices to the number density of ice
-        number_density[4 * n + ICE_INDEX, xx, yy] = N_ice
+        number_density[3 * n + ICE_INDEX, xx, yy] = N_ice
 
-        Q_coefficients[4 * n + ICE_INDEX, :] = species_parameters['ice']['Q']
+        Q_coefficients[3 * n + ICE_INDEX, :] = species_parameters['ice']['Q']
 
         # ============== RAIN ==================== #
         rho_rain = rho_dry * qrain[n]
@@ -364,17 +359,19 @@ def dEtotal(
         )
         lambda_rain = np.repeat(lambda_rain[:, np.newaxis], len(bin_edges), axis=-1)
         # integrate the log normal size function between bin_edges[k] to bin_edges[k + 1]
-        number_density_rain = (
+        number_density_rain = np.asarray(
             0.5
             * (species_parameters['rain']['N0'] / lambda_rain)
             * np.exp(-2 * lambda_rain * bin_edges)
         )
+        number_density_rain[~np.isfinite(number_density_rain)] = 0.0
+
         # get the difference between the integrand at the bin edges
-        number_density[4 * n + RAIN_INDEX, :, :] = (
+        number_density[3 * n + RAIN_INDEX, :, :] = (
             number_density_rain[:, :-1] - number_density_rain[:, 1:]
         )
 
-        Q_coefficients[4 * n + RAIN_INDEX, :] = species_parameters['rain']['Q']
+        Q_coefficients[3 * n + RAIN_INDEX, :] = species_parameters['rain']['Q']
 
         # ============== SNOW ==================== #
         rho_snow = rho_dry * qsnow[n]
@@ -389,26 +386,38 @@ def dEtotal(
         N0_snow = np.repeat(N0_snow[:, np.newaxis], len(bin_edges), axis=-1)
         lambda_snow = np.repeat(lambda_snow[:, np.newaxis], len(bin_edges), axis=-1)
         # integrate the log normal size function between bin_edges[k] to bin_edges[k + 1]
-        number_density_snow = (
+        number_density_snow = np.asarray(
             0.5 * (N0_snow / lambda_snow) * np.exp(-lambda_snow * 2 * bin_edges)
         )
         # get the difference between the integrand at the bin edges
-        number_density[4 * n + SNOW_INDEX, :, :] = (
+        number_density[3 * n + SNOW_INDEX, :, :] = (
             number_density_snow[:, :-1] - number_density_snow[:, 1:]
         )
+        number_density_snow[~np.isfinite(number_density_snow)] = 0.0
 
-        Q_coefficients[4 * n + SNOW_INDEX, :] = species_parameters['snow']['Q']
+        Q_coefficients[3 * n + SNOW_INDEX, :] = species_parameters['snow']['Q']
 
-        for i, phase in enumerate(['rain', 'snow', 'ice', 'liquid']):
+        for i, phase in enumerate(['rain', 'snow', 'ice']):
             vi = (
                 species_parameters[phase]["x"]
                 * (2 * bin_center) ** species_parameters[phase]["y"],
             )
-            velocity[4 * n + i, :, :] = np.outer(
+            velocity[3 * n + i, :, :] = np.outer(
                 (P0 / P) ** species_parameters[phase]["gamma"], vi
             )
 
-    dEdt, invtc = dEdt6(
+    return number_density, velocity, species_id, Q_coefficients, Ebreakdown, bin_edges
+
+
+def get_dEtotal(
+    number_density: np.ndarray,
+    velocity: np.ndarray,
+    species_id: np.ndarray,
+    Q_coefficients: np.ndarray,
+    Ebreakdown: np.ndarray,
+    bin_edges: np.ndarray,
+):
+    dEdt, invtc =  dEdt6(
         np.transpose(number_density, (1, 0, 2)),
         np.transpose(velocity, (1, 0, 2)),
         species_id.T,
@@ -416,4 +425,4 @@ def dEtotal(
         Ebreakdown,
         binbounds=bin_edges,
     )
-    return dEdt, invtc, number_density, velocity, bin_edges
+    return dEdt, invtc 
