@@ -31,7 +31,7 @@ class Extractor:
         :raises FileNotFoundError: when no files were found
         """
 
-        files = sorted(glob.glob(os.path.abspath(os.path.join(folder, "extract*.nc"))))
+        files = sorted(glob.glob(os.path.join(os.path.abspath(folder), "extract*.nc")))
         iarr = []
         for file in files:
             iarr.append(file)
