@@ -19,6 +19,7 @@ dependencies = [
     "netcdf4",
     "tqdm>=4.67.1",
     "scipy>=1.15.3",
+    "numba>=0.62.0",
 ]
 authors = [
     { name = 'Ramanakumar Sankar', email = 'ramanakumar.shankar@gmail.com' },
