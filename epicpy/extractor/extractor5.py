@@ -1,6 +1,7 @@
 import os
 
 import netCDF4 as nc
+import numpy as np
 
 from .extractor import Extractor
 
@@ -33,7 +34,7 @@ class Extractor5(Extractor):
         if not os.path.isfile(file):
             raise FileNotFoundError(f"extract.nc not found in {folder}")
 
-        return [file]
+        return np.asarray([file])
 
     def get_coordinates(self):
         """

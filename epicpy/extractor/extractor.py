@@ -52,13 +52,15 @@ class Extractor:
             # soft break out and don't add any new files
             return
 
-        self.files = self.files[:start].tolist()
+        # convert to a list so we can do array manipulation
+        files = self.files[:start].tolist()
+
         try:
-            self.files.extend(self.getextractmatch(restart_folder))
+            files.extend(self.getextractmatch(restart_folder))
         except FileNotFoundError:
             pass
 
-        self.files = np.asarray(self.files)
+        self.files = np.asarray(files)
 
         self.setup_time()
 
