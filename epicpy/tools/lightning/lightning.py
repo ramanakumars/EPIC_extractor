@@ -37,7 +37,7 @@ def get_lightning(extract: Extractor, time: int, subsample: int = 1):
     return (
         dEdt.reshape(qrain[0].shape),
         invt.reshape(qrain[0].shape),
-        Ns.reshape((qrain.shape[0] * 4, *qrain[0].shape, sizes.size - 1)),
-        velocity.reshape((qrain.shape[0] * 4, *qrain[0].shape, sizes.size - 1)),
+        Ns.reshape((qrain.shape[0] * 3, *qrain[0].shape, sizes.size - 1)),
+        velocity.reshape((qrain.shape[0] * 3, *qrain[0].shape, sizes.size - 1)),
         sizes,
     )
