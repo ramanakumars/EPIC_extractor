@@ -18,7 +18,14 @@ class Extractor:
         :param input_folder: folder containing extract.nc files
         """
         self.root_folder = os.path.abspath(imgfolder)
-        self.files = self.getextractmatch(self.root_folder)
+
+        # set up sizes
+        self.time = []
+        self.tarr_file = []
+        self.tarr_index_in_file = []
+
+        files = self.getextractmatch(self.root_folder)
+        self.setup_time(files)
         self.setup_extract()
 
     def getextractmatch(self, folder: str) -> np.array:
@@ -41,28 +48,58 @@ class Extractor:
 
         return np.asarray(iarr)
 
-    def add_restarts(self, restart_folder: str, start: int = -1) -> None:
+    def add_restarts(self, restart_folder: str, start: int = 1) -> None:
         """
         adds extract files from a restart folder
 
         :param resfolder: folder containing the restart .nc files
-        :param start: the timestep index at which to concatenate the restart files
+        :param start: the timestep index at which to concatenate the restart files (start=1 skips the first index in the new set of files)
         """
         if not os.path.exists(restart_folder):
             # soft break out and don't add any new files
             return
 
-        # convert to a list so we can do array manipulation
-        files = self.files[:start].tolist()
+        # get the new filelist for this restart
+        files = []
 
         try:
-            files.extend(self.getextractmatch(restart_folder))
+            files.extend(self.getextractmatch(restart_folder).tolist())
         except FileNotFoundError:
             pass
 
-        self.files = np.asarray(files)
+        self.setup_time(files, start=start)
 
-        self.setup_time()
+    def setup_time(self, files: list[str], start=0) -> None:
+        '''
+        Get all the timestamps for the outputs. Also finds the index/file correspondence
+        when having restart simulations
+        '''
+        time, tarr_file, tarr_index_in_file = self.get_filenames_and_indices(files)
+
+        self.time.extend(time[start:])
+        self.tarr_file.extend(tarr_file[start:])
+        self.tarr_index_in_file.extend(tarr_index_in_file[start:])
+        self.nt = len(self.time)
+
+    def get_filenames_and_indices(
+        self, files: list[str]
+    ) -> [list[float], list[str], list[int]]:
+        '''
+        Get all the filenames and indices/times for each timestamp in the outputs
+        '''
+        # set up sizes
+        time = []
+        tarr_file = []
+        tarr_index_in_file = []
+        for i, fname in enumerate(files):
+            with nc.Dataset(fname, 'r') as dset:
+                time.append(float(dset.variables['time'][0]))
+                # the time dimension is only the first index in each file
+                # since EPIC 4 staggers one timestep per output file
+                tarr_file.append(fname)
+                tarr_index_in_file.append(0)
+
+        return time, tarr_file, tarr_index_in_file
 
     def setup_extract(self) -> None:
         '''
@@ -70,7 +107,6 @@ class Extractor:
         outputs (e.g., thermo variables, grid sizes, extents etc.)
         Should be called immediately after initialization of the class
         '''
-        self.setup_time()
 
         # Open the first dataset
         self.get_coordinates()
@@ -102,30 +138,6 @@ class Extractor:
 
         self.lat_pv = self.get_variable_at_time("lat_pv", 0)
         self.lon_pv = self.get_variable_at_time("lon_pv", 0)
-
-    def setup_time(self) -> None:
-        '''
-        Get all the timestamps for the outputs. Also finds the index/file correspondence
-        when having restart simulations
-        '''
-        self.nt = len(self.files)
-
-        # set up sizes
-        self.time = []
-        self.tarr_file = []
-        self.tarr_index_in_file = []
-        for i, ti in enumerate(self.files):
-            fname = self.files[i]
-            with nc.Dataset(fname, 'r') as dset:
-                self.time.append(float(dset.variables['time'][0]))
-                # the time dimension is only the first index in each file
-                # since EPIC 4 staggers one timestep per output file
-                self.tarr_file.append(fname)
-                self.tarr_index_in_file.append(0)
-
-        self.time = np.asarray(self.time)
-        self.tarr_file = np.asarray(self.tarr_file)
-        self.tarr_index_in_file = np.asarray(self.tarr_index_in_file)
 
     def set_shape_factors(self) -> None:
         '''

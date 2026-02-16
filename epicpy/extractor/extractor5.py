@@ -36,6 +36,25 @@ class Extractor5(Extractor):
 
         return np.asarray([file])
 
+    def get_filenames_and_indices(
+        self, files: list[str]
+    ) -> [list[float], list[str], list[int]]:
+        '''
+        Get all the filenames and indices/times for each timestamp in the outputs
+        '''
+        # set up sizes
+        time = []
+        tarr_file = []
+        tarr_index_in_file = []
+        for i, fname in enumerate(files):
+            with nc.Dataset(fname, 'r') as dset:
+                time.extend(dset.variables['time'][:].tolist())
+                # EPIC 5 outputs have multiple timesteps per output file
+                tarr_file.extend([fname] * len(dset.variables['time'][:]))
+                tarr_index_in_file.extend(list(range(len(dset.variables['time'][:]))))
+
+        return time, tarr_file, tarr_index_in_file
+
     def get_coordinates(self):
         """
         Get basic coordinates of the model and cache them for easy access
@@ -68,22 +87,3 @@ class Extractor5(Extractor):
         except KeyError:
             self.lat_pv = self.get_variable_at_time("lat_pv2", 0)
             self.lon_pv = self.get_variable_at_time("lon_pv2", 0)
-
-    def setup_time(self) -> None:
-        '''
-        Get all the timestamps for the outputs. Also finds the index/file correspondence
-        when having restart simulations
-        '''
-        # set up sizes
-        self.time = []
-        self.tarr_file = []
-        self.tarr_index_in_file = []
-        for i, ti in enumerate(self.files):
-            fname = self.files[i]
-            with nc.Dataset(fname, 'r') as dset:
-                self.time.extend(dset.variables['time'][:].tolist())
-                # EPIC 5 outputs have multiple timesteps per output file
-                self.tarr_file.extend([fname] * len(dset.variables['time'][:]))
-                self.tarr_index_in_file.extend(
-                    list(range(len(dset.variables['time'][:])))
-                )
