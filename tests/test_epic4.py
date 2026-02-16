@@ -14,12 +14,12 @@ class TestClass:
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
         extract.add_restarts(os.path.join(root_folder, 'epic4_test/restart1/'))
 
-        assert len(extract.files) == 21
+        assert len(extract.time) == 21
 
     def test_number_of_extracts_without_restart(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
 
-        assert len(extract.files) == 11
+        assert len(extract.time) == 11
 
     def test_missing_folder(self):
         with pytest.raises(FileNotFoundError):
@@ -29,7 +29,7 @@ class TestClass:
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
         extract.add_restarts(os.path.join(root_folder, 'epic4_test/restart_missing/'))
         
-        assert len(extract.files) == 11
+        assert len(extract.time) == 11
 
     def test_variable(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
