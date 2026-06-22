@@ -236,6 +236,40 @@ class Extractor:
 
         return variable
 
+    def get_variables_at_time(self, variables: list[str], time: int) -> np.array:
+        """
+        Get a given variable for a given index
+
+        :param var: variable name
+        :param time: index of the output
+
+        :returns: a numpy array of the variable for requested time
+
+        :raises KeyError: if the dataset does not contain `var`
+        """
+        fname = self.tarr_file[time]
+
+        output = {}
+
+        with nc.Dataset(fname, 'r') as dset:
+            for var in variables:
+                if var == 'ertel_pv':
+                    data = self.get_ertel_pv(time)
+
+                if var not in dset.variables:
+                    raise KeyError(
+                        f'Dataset does not contain {var} at time {time} => {self.time[time]}'
+                    )
+
+                ind = self.tarr_index_in_file[time]
+
+                if dset.variables[var].dimensions[0] == 'time':
+                    data = dset.variables[var][ind, :]
+                else:
+                    data = dset.variables[var][:]
+                output[var] = data
+        return output
+
     def get_variable(self, var: str, time: list[int] | int | None = None) -> np.array:
         """
         Wrapper function to get a variable for a range of times
@@ -257,6 +291,36 @@ class Extractor:
             for ix in time:
                 data.append(self.get_variable_at_time(var, ix))
             return np.asarray(data)
+        else:
+            raise ValueError(
+                f"time must be None, integer or a list of time values. Got {time}"
+            )
+
+    def get_variables(
+        self, variables: list[str], time: list[int] | int | None = None
+    ) -> dict[str, np.array]:
+        """
+        Wrapper function to get a variable for a range of times
+
+        :param var: name of the variable
+        :param time: either a list of indices, a single index or None, in which case all the extracts are used
+
+        :returns: a numpy array of the variable for the range of requested times
+
+        :raises KeyError: if the dataset does not contain `var`
+        :raises ValueError: if the input time format is not correct
+        """
+        if time is None:
+            time = range(len(self.time))
+        if time is not None and isinstance(time, int):
+            return self.get_variables_at_time(variables, time)
+        elif isinstance(time, Iterable):
+            output = {var: [] for var in variables}
+            for ix in time:
+                data_subset = self.get_variables_at_time(variables, ix)
+                for var in variables:
+                    output[var].append(data_subset[var])
+            return output
         else:
             raise ValueError(
                 f"time must be None, integer or a list of time values. Got {time}"
