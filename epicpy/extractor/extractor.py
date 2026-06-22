@@ -238,9 +238,9 @@ class Extractor:
 
     def get_variables_at_time(self, variables: list[str], time: int) -> np.array:
         """
-        Get a given variable for a given index
+        Get a set of variables for a given index
 
-        :param var: variable name
+        :param variables: list of the variables to be fetched
         :param time: index of the output
 
         :returns: a numpy array of the variable for requested time
@@ -300,9 +300,9 @@ class Extractor:
         self, variables: list[str], time: list[int] | int | None = None
     ) -> dict[str, np.array]:
         """
-        Wrapper function to get a variable for a range of times
+        Wrapper function to get multiple variable for a range of times
 
-        :param var: name of the variable
+        :param variables: list of the variables to be fetched
         :param time: either a list of indices, a single index or None, in which case all the extracts are used
 
         :returns: a numpy array of the variable for the range of requested times
@@ -320,7 +320,7 @@ class Extractor:
                 data_subset = self.get_variables_at_time(variables, ix)
                 for var in variables:
                     output[var].append(data_subset[var])
-            return output
+            return {key: np.asarray(var) for key, var in output.items()}
         else:
             raise ValueError(
                 f"time must be None, integer or a list of time values. Got {time}"
