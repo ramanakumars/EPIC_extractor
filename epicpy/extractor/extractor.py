@@ -5,6 +5,7 @@ from collections.abc import Iterable
 
 import netCDF4 as nc
 import numpy as np
+from tqdm.auto import tqdm
 
 
 class Extractor:
@@ -121,23 +122,42 @@ class Extractor:
         Get basic coordinates of the model and cache them for easy access
         """
         # vertical coordinates
-        self.sigmatheta = self.get_variable_at_time("sigmatheta_h", 0)
-        self.sigmatheta_u = self.get_variable_at_time("sigmatheta_u", 0)
-        self.sigmatheta_v = self.get_variable_at_time("sigmatheta_v", 0)
-        self.sigmatheta_pv = self.get_variable_at_time("sigmatheta_pv", 0)
+
+        data = self.get_variables_at_time(
+            [
+                'sigmatheta_h',
+                'sigmatheta_u',
+                'sigmatheta_v',
+                'sigmatheta_pv',
+                'lat_h',
+                'lon_h',
+                'lat_u',
+                'lon_u',
+                'lat_pv',
+                'lon_pv',
+                'lat_v',
+                'lon_v',
+            ],
+            0,
+        )
+
+        self.sigmatheta = data["sigmatheta_h"]
+        self.sigmatheta_u = data["sigmatheta_u"]
+        self.sigmatheta_v = data["sigmatheta_v"]
+        self.sigmatheta_pv = data["sigmatheta_pv"]
 
         # Lat/lon grids for different variable types
-        self.lat_h = self.get_variable_at_time("lat_h", 0)
-        self.lon_h = self.get_variable_at_time("lon_h", 0)
+        self.lat_h = data["lat_h"]
+        self.lon_h = data["lon_h"]
 
-        self.lat_u = self.get_variable_at_time("lat_u", 0)
-        self.lon_u = self.get_variable_at_time("lon_u", 0)
+        self.lat_u = data["lat_u"]
+        self.lon_u = data["lon_u"]
 
-        self.lat_v = self.get_variable_at_time("lat_v", 0)
-        self.lon_v = self.get_variable_at_time("lon_v", 0)
+        self.lat_v = data["lat_v"]
+        self.lon_v = data["lon_v"]
 
-        self.lat_pv = self.get_variable_at_time("lat_pv", 0)
-        self.lon_pv = self.get_variable_at_time("lon_pv", 0)
+        self.lat_pv = data["lat_pv"]
+        self.lon_pv = data["lon_pv"]
 
     def set_shape_factors(self) -> None:
         '''
@@ -161,9 +181,9 @@ class Extractor:
         self.n_pv = np.zeros((self.grid_nk + 1, self.grid_nj + 1))
 
         try:
-            self.gravity = self.get_variable_at_time("gravity", 0)
+            self.gravity = self.get_variables_at_time("gravity", 0)['gravity']
         except KeyError:
-            self.gravity = self.get_variable_at_time("gravity2", 0)
+            self.gravity = self.get_variables_at_time("gravity2", 0)['gravity2']
         self.gave = self.gravity.mean()
 
         f_pv = np.zeros((self.grid_nk + 1, self.grid_nj + 1, self.grid_ni))
@@ -205,7 +225,7 @@ class Extractor:
         """
         return nc.Dataset(self.tarr_file[time], 'r')
 
-    def get_variable_at_time(self, var: str, time: int) -> np.array:
+    def get_variable_at_time(self, var: str, time: int, dset: nc.Dataset) -> np.array:
         """
         Get a given variable for a given index
 
@@ -216,27 +236,24 @@ class Extractor:
 
         :raises KeyError: if the dataset does not contain `var`
         """
-        fname = self.tarr_file[time]
+        if var == 'ertel_pv':
+            return self.get_ertel_pv(time, dset)
 
-        with nc.Dataset(fname, 'r') as dset:
-            if var == 'ertel_pv':
-                return self.get_ertel_pv(time)
+        if var not in dset.variables:
+            raise KeyError(
+                f'Dataset does not contain {var} at time {dset.variables["time"][0]}'
+            )
 
-            if var not in dset.variables:
-                raise KeyError(
-                    f'Dataset does not contain {var} at time {time} => {self.time[time]}'
-                )
+        ind = self.tarr_index_in_file[time]
 
-            ind = self.tarr_index_in_file[time]
-
-            if dset.variables[var].dimensions[0] == 'time':
-                variable = dset.variables[var][ind, :]
-            else:
-                variable = dset.variables[var][:]
+        if dset.variables[var].dimensions[0] == 'time':
+            variable = dset.variables[var][ind, :]
+        else:
+            variable = dset.variables[var][:]
 
         return variable
 
-    def get_variables_at_time(self, variables: list[str], time: int) -> np.array:
+    def get_variables_at_time(self, variables: list[str] | str, time: int) -> np.array:
         """
         Get a set of variables for a given index
 
@@ -247,54 +264,17 @@ class Extractor:
 
         :raises KeyError: if the dataset does not contain `var`
         """
+        if isinstance(variables, str):
+            variables = [variables]
+
         fname = self.tarr_file[time]
 
         output = {}
 
         with nc.Dataset(fname, 'r') as dset:
             for var in variables:
-                if var == 'ertel_pv':
-                    data = self.get_ertel_pv(time)
-
-                if var not in dset.variables:
-                    raise KeyError(
-                        f'Dataset does not contain {var} at time {time} => {self.time[time]}'
-                    )
-
-                ind = self.tarr_index_in_file[time]
-
-                if dset.variables[var].dimensions[0] == 'time':
-                    data = dset.variables[var][ind, :]
-                else:
-                    data = dset.variables[var][:]
-                output[var] = data
+                output[var] = self.get_variable_at_time(var, time, dset)
         return output
-
-    def get_variable(self, var: str, time: list[int] | int | None = None) -> np.array:
-        """
-        Wrapper function to get a variable for a range of times
-
-        :param var: name of the variable
-        :param time: either a list of indices, a single index or None, in which case all the extracts are used
-
-        :returns: a numpy array of the variable for the range of requested times
-
-        :raises KeyError: if the dataset does not contain `var`
-        :raises ValueError: if the input time format is not correct
-        """
-        if time is None:
-            time = range(len(self.time))
-        if time is not None and isinstance(time, int):
-            return self.get_variable_at_time(var, time)
-        elif isinstance(time, Iterable):
-            data = []
-            for ix in time:
-                data.append(self.get_variable_at_time(var, ix))
-            return np.asarray(data)
-        else:
-            raise ValueError(
-                f"time must be None, integer or a list of time values. Got {time}"
-            )
 
     def get_variables(
         self, variables: list[str], time: list[int] | int | None = None
@@ -310,13 +290,16 @@ class Extractor:
         :raises KeyError: if the dataset does not contain `var`
         :raises ValueError: if the input time format is not correct
         """
+        if isinstance(variables, str):
+            variables = [variables]
+
         if time is None:
             time = range(len(self.time))
         if time is not None and isinstance(time, int):
             return self.get_variables_at_time(variables, time)
         elif isinstance(time, Iterable):
             output = {var: [] for var in variables}
-            for ix in time:
+            for ix in tqdm(time):
                 data_subset = self.get_variables_at_time(variables, ix)
                 for var in variables:
                     output[var].append(data_subset[var])
@@ -357,7 +340,7 @@ class Extractor:
             else:
                 return {attr: getattr(dset, attr) for attr in output_attrs}
 
-    def get_ertel_pv(self, time: int) -> np.array:
+    def get_ertel_pv(self, time: int, dset: nc.Dataset) -> np.array:
         '''
         Get Ertel's PV in the sigma portion of the zeta coordinate.
         Calculates the (d theta/d zeta) term and multiplies the
@@ -367,8 +350,9 @@ class Extractor:
 
         :returns: the Ertel's PV at `time`
         '''
-        pv = self.get_variable_at_time('pv', time)
-        theta = self.get_variable_at_time('theta', time)
+        data = self.get_variables_at_time(['pv', 'theta'], time)
+        pv = data['pv']
+        theta = data['theta']
         sigth = self.sigmatheta_pv
 
         ertel_pv = pv.copy()
