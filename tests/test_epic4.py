@@ -28,7 +28,7 @@ class TestClass:
     def test_missing_restart_folder(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
         extract.add_restarts(os.path.join(root_folder, 'epic4_test/restart_missing/'))
-        
+
         assert len(extract.time) == 11
 
     def test_variable(self):
@@ -39,13 +39,13 @@ class TestClass:
         ) as indset:
             variable = indset.variables["H_2O_vapor"][0, :]
 
-        assert np.all(variable == extract.get_variable("H_2O_vapor", 0))
-    
+        assert np.all(variable == extract.get_variables("H_2O_vapor", 0)["H_2O_vapor"])
+
     def test_missing_variable(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
         with pytest.raises(KeyError):
-            extract.get_variable("missing")
-    
+            extract.get_variables("missing")
+
     def test_variable_multiple_times(self):
         extract = Extractor(os.path.join(root_folder, 'epic4_test/'))
 
@@ -56,4 +56,7 @@ class TestClass:
             ) as indset:
                 variable.append(indset.variables["H_2O_vapor"][0, :])
 
-        assert np.all(np.asarray(variable) == extract.get_variable("H_2O_vapor", range(5)))
+        assert np.all(
+            np.asarray(variable)
+            == extract.get_variables("H_2O_vapor", range(5))["H_2O_vapor"]
+        )
