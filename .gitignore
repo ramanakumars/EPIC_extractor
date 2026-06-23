@@ -131,3 +131,10 @@ dmypy.json
 # Ignore images and videos
 *.png
 *.mp4
+
+# ignore docs build
+docs/build/
+docs/source/notebooks/
+
+# ignore coverage tests
+htmlcov/

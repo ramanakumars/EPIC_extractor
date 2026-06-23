@@ -4,19 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["epic_extractor"]
+include = ["epicpy"]
 exclude = []
 namespaces = false
 
 [project]
-name = "epic_extractor"
+name = "epicpy"
 dynamic = ["version"]
 license = { file = 'LICENSE' }
 description = 'Analysis package for the EPIC atmospheric model'
 requires-python = ">=3.10"
 dependencies = [
     'numpy>=2.2.4',
-    'netcdf4'
+    "netcdf4",
+    "tqdm>=4.67.1",
+    "scipy>=1.15.3",
+    "numba>=0.62.0",
 ]
 authors = [
     { name = 'Ramanakumar Sankar', email = 'ramanakumar.shankar@gmail.com' },
@@ -24,10 +27,21 @@ authors = [
 readme = "README.md"
 
 [tool.setuptools.dynamic]
-version = { attr = "epic_extractor.version.__version__" }
+version = { attr = "epicpy.version.__version__" }
 
 [project.urls]
 repository = "https://www.github.com/ramanakumars/epic_extractor"
 
 [project.scripts]
-interpolate_N2 = 'epic_extractor.tools.integrate_N2:extrapolate_Tp'
+interpolate_N2 = 'epicpy.tools.integrate_N2:extrapolate_Tp'
+
+[dependency-groups]
+dev = [
+    "coveralls>=4.0.1",
+    "myst-parser>=4.0.1",
+    "nbsphinx>=0.9.7",
+    "pytest>=8.4.1",
+    "pytest-cov>=6.2.1",
+    "sphinx>=8.1.3",
+    "sphinx-book-theme>=1.1.4",
+]
